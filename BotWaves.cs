@@ -157,43 +157,38 @@ public class BotWaves : BasePlugin, IPluginConfig<ConfigGen>
 
     private void EnableWaveMode(int startWave, bool usedOverride = false)
     {
-        Console.WriteLine($"[Bot Waves] Enabling wave mode, starting at wave {startWave}");
-        Console.WriteLine($"[Bot Waves] Human team: {g_Main.humanTeam}, Bot team: {g_Main.botTeam}");
-        Console.WriteLine($"[Bot Waves] Override used: {usedOverride}");
+      Console.WriteLine($"[Bot Waves] Enabling wave mode, starting at wave {startWave}");
+   Console.WriteLine($"[Bot Waves] Human team: {g_Main.humanTeam}, Bot team: {g_Main.botTeam}");
+    Console.WriteLine($"[Bot Waves] Override used: {usedOverride}");
 
-        g_Main.isWaveModeActive = true;
+ g_Main.isWaveModeActive = true;
         g_Main.currentWaveBotCount = startWave;
         g_Main.waveModeJustActivated = true;
         g_Main.waveStartedWithOverride = usedOverride;
-        g_Main.playersAssignedToTeam.Clear();
+    g_Main.playersAssignedToTeam.Clear();
 
-        // Save current server cvar values
+     // Save current server cvar values
         SaveServerCvar("mp_autoteambalance");
         SaveServerCvar("mp_limitteams");
         SaveServerCvar("mp_teambalance_enabled");
-        SaveServerCvar("mp_force_pick_time");
-        SaveServerCvar("mp_roundtime");
-        SaveServerCvar("mp_ignore_round_win_conditions");
+     SaveServerCvar("mp_force_pick_time");
+  SaveServerCvar("mp_roundtime");
         SaveServerCvar("mp_warmuptime");
         SaveServerCvar("mp_do_warmup_period");
-        SaveServerCvar("mp_forcecamera");
+      SaveServerCvar("mp_forcecamera");
 
-        Console.WriteLine($"[Bot Waves] Saved {g_Main.savedCvars.Count} cvar values");
+   Console.WriteLine($"[Bot Waves] Saved {g_Main.savedCvars.Count} cvar values");
 
-        // Disable all auto-balancing mechanisms
-        Server.ExecuteCommand("mp_autoteambalance 0");
-        Server.ExecuteCommand("mp_limitteams 0");
-        Server.ExecuteCommand("mp_teambalance_enabled 0");
-        Server.ExecuteCommand("mp_force_pick_time 0");
-        
-        // Prevent CS2 from ending rounds when team composition changes
-        Server.ExecuteCommand("mp_ignore_round_win_conditions 1");
-        Console.WriteLine("[Bot Waves] Set mp_ignore_round_win_conditions 1 to prevent auto-restarts");
+    // Disable all auto-balancing mechanisms
+      Server.ExecuteCommand("mp_autoteambalance 0");
+ Server.ExecuteCommand("mp_limitteams 0");
+    Server.ExecuteCommand("mp_teambalance_enabled 0");
+   Server.ExecuteCommand("mp_force_pick_time 0");
         
         // Disable warmup to prevent round restarts on player joins
-        Server.ExecuteCommand("mp_warmuptime 0");
+      Server.ExecuteCommand("mp_warmuptime 0");
         Server.ExecuteCommand("mp_do_warmup_period 0");
-        Console.WriteLine("[Bot Waves] Disabled warmup to prevent player join restarts");
+    Console.WriteLine("[Bot Waves] Disabled warmup to prevent player join restarts");
 
         // Force spectators to only watch their own team (Terrorists)
         Server.ExecuteCommand("mp_forcecamera 1");
@@ -204,25 +199,25 @@ public class BotWaves : BasePlugin, IPluginConfig<ConfigGen>
         Server.ExecuteCommand("bot_kick");
 
         // Mark all players for team assignment on next spawn
-        Console.WriteLine("[Bot Waves] Marking all players for team assignment on next spawn");
+      Console.WriteLine("[Bot Waves] Marking all players for team assignment on next spawn");
         var allPlayers = Utilities.GetPlayers().Where(p => p != null && p.IsValid && !p.IsBot && !p.IsHLTV).ToList();
-        foreach (var playerToAssign in allPlayers)
-        {
+   foreach (var playerToAssign in allPlayers)
+  {
             if (IsSpectator(playerToAssign))
             {
-                Console.WriteLine($"[Bot Waves] {playerToAssign.PlayerName} is spectator, will stay in spec");
+       Console.WriteLine($"[Bot Waves] {playerToAssign.PlayerName} is spectator, will stay in spec");
                 continue;
-            }
+       }
 
-            Console.WriteLine($"[Bot Waves] {playerToAssign.PlayerName} marked for T team assignment");
-        }
+   Console.WriteLine($"[Bot Waves] {playerToAssign.PlayerName} marked for T team assignment");
+  }
 
         // Restart game to immediately start wave mode
-        Console.WriteLine("[Bot Waves] Restarting game to begin wave mode");
+Console.WriteLine("[Bot Waves] Restarting game to begin wave mode");
         Server.ExecuteCommand("mp_restartgame 1");
 
         Server.PrintToChatAll(Localizer["Wave.StartingAtWave", startWave]);
-    }
+  }
 
     private void DisableWaveMode()
     {
@@ -277,13 +272,12 @@ public class BotWaves : BasePlugin, IPluginConfig<ConfigGen>
         {
             string defaultValue = cvarName switch
             {
-          "mp_autoteambalance" => "1",
+   "mp_autoteambalance" => "1",
    "mp_limitteams" => "2",
-          "mp_teambalance_enabled" => "1",
-             "mp_force_pick_time" => "15",
+      "mp_teambalance_enabled" => "1",
+      "mp_force_pick_time" => "15",
         "mp_roundtime" => "1.92",
-                "mp_ignore_round_win_conditions" => "0",
-     "mp_warmuptime" => "60",
+             "mp_warmuptime" => "60",
              "mp_do_warmup_period" => "1",
            "mp_forcecamera" => "0",
              _ => "1"
