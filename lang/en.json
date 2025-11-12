@@ -1,22 +1,22 @@
 {   
-    "Wave.TurnedOff": " {green}[Bot Wave]{default} Turned off.",
-    "Wave.PleaseUseNumber": " {green}[Bot Wave]{default} Please use a number.",
-    "Wave.SpecialCodeAccepted": " {green}[Bot Wave]{default} Special code accepted!",
-    "Wave.OnlyFourPlayers": " {green}[Bot Wave]{default} Only 1-4 players can play.",
-    "Wave.StartingWithOverride": " {green}[Bot Wave]{default} Starting at wave {0} with {1} players!",
-    "Wave.StartingAtWave": " {green}[Bot Wave]{default} Starting at wave {0}!",
-    "Wave.FifthPlayerJoined": " {green}[Bot Wave]{default} A 5th player joined the server. Bot Waves disabled.",
+    "Wave.TurnedOff": " {green}[!wave]{default} Turned off.",
+    "Wave.PleaseUseNumber": " {green}[!wave]{default} Please use a number.",
+    "Wave.SpecialCodeAccepted": " {green}[!wave]{default} Special code accepted!",
+    "Wave.OnlyFourPlayers": " {green}[!wave]{default} Only 1-4 players can play.",
+    "Wave.StartingWithOverride": " {green}[!wave]{default} Starting at wave {0} with {1} players!",
+    "Wave.StartingAtWave": " {green}[!wave]{default} Starting at wave {0}!",
+    "Wave.FifthPlayerJoined": " {green}[!wave]{default} A 5th player joined the server. Bot Waves disabled.",
     "Wave.FifthPlayerJoinedThanks": " {lime}Thanks for helping populate the server! Enjoy the regular AWP gameplay.",
-    
-    "Wave.HelpStart": " {green}[Bot Wave]{default} Type {lime}!wave{default} to start wave mode!",
-    "Wave.HelpCustomWave": " {green}[Bot Wave]{default} Use {lime}!wave <number>{default} to start at a specific wave (e.g., !wave 10)",
-    "Wave.HelpTurnOff": " {green}[Bot Wave]{default} Use {lime}!wave off{default} to disable wave mode",
-    
-    "Wave.YouWonNext": " {green}[Bot Wave]{default} You won! Next: Wave {0}",
-  "Wave.YouLostTryAgain": " {green}[Bot Wave]{default} You lost. Try wave {0} again!",
 
-    "Wave.FightBots": " {green}[Bot Wave]{default} Wave {0} - Fight {1} bots!",
-    "Wave.SpawnLimitReached": " {green}[Bot Wave]{default} Only {0} bots fit on map. {1} will re-spawn!",
-    "Wave.NoMoreRespawns": " {green}[Bot Wave]{default} No more bot re-spawns! Kill the rest!",
-    "Wave.RespawnsLeft": " {green}[Bot Wave]{default} Bot re-spawns left: {0}"
+    "Wave.HelpStart": " {green}[!wave]{default} Type {lime}!wave{default} to start wave mode!",
+    "Wave.HelpCustomWave": " {green}[!wave]{default} Use {lime}!wave <number>{default} to start at a specific wave (e.g., !wave 10)",
+    "Wave.HelpTurnOff": " {green}[!wave]{default} Use {lime}!wave off{default} to disable wave mode",
+
+    "Wave.YouWonNext": " {green}[!wave]{default} You won! Next: Wave {0}",
+  "Wave.YouLostTryAgain": " {green}[!wave]{default} You lost. Try wave {0} again!",
+
+    "Wave.FightBots": " {green}[!wave]{default} Wave {0} - Fight {1} bots!",
+    "Wave.SpawnLimitReached": " {green}[!wave]{default} Only {0} bots fit on map. {1} will re-spawn!",
+    "Wave.NoMoreRespawns": " {green}[!wave]{default} No more bot re-spawns! Kill the rest!",
+    "Wave.RespawnsLeft": " {green}[!wave ]{default} Bot re-spawns left: {0}"
 }

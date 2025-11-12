@@ -1,48 +1,22 @@
-{
-    "PrintChatToAll.LessPlayers": "{green}Gold KingZ {grey}| {grey}Server Has Less Players {lime}Adding {0} Bots",
-    "PrintChatToAll.KickBots": "{green}Gold KingZ {grey}| {grey}Server Has More Players {darkred}Kicking All Bots",
-    
-    "Wave.TurnedOff": " {green}[Bot Wave]{default} Turned off.",
-    "Wave.PleaseUseNumber": " {green}[Bot Wave]{default} Please use a number.",
-    "Wave.SpecialCodeAccepted": " {green}[Bot Wave]{default} Special code accepted!",
-    "Wave.OnlyFourPlayers": " {green}[Bot Wave]{default} Only 1-4 players can play.",
-    "Wave.StartingWithOverride": " {green}[Bot Wave]{default} Starting at wave {0} with {1} players!",
-    "Wave.StartingAtWave": " {green}[Bot Wave]{default} Starting at wave {0}!",
-    "Wave.WillStartNextRound": " {green}[Bot Wave]{default} Wave mode enabled! Wave {0} will start next round.",
-    "Wave.TypeToStart": " {green}[Bot Wave]{default} Type !wave to start!",
-    "Wave.TooManyPlayers": " {green}[Bot Wave]{default} Too many players joined! Turning off.",
-    "Wave.ChangingWave": " {green}[Bot Wave]{default} Changing to wave {0}. Ending current round...",
-    "Wave.FifthPlayerJoined": " {green}[Bot Wave]{default} A 5th player joined the server. Bot Waves disabled.{nextline} {lime}Thanks for helping populate the server! Enjoy the regular AWP gameplay.",
-    
-    "Wave.HelpStart": " {green}[Bot Wave]{default} Type {lime}!wave{default} to start wave mode!",
-    "Wave.HelpCustomWave": " {green}[Bot Wave]{default} Use {lime}!wave <number>{default} to start at a specific wave (e.g., !wave 10)",
-    "Wave.HelpTurnOff": " {green}[Bot Wave]{default} Use {lime}!wave off{default} to disable wave mode",
-    
-    "Wave.YouWonNext": " {green}[Bot Wave]{default} You won! Next: Wave {0}",
-    "Wave.YouLostTryAgain": " {green}[Bot Wave]{default} You lost. Try wave {0} again!",
+{   
+    "Wave.TurnedOff": " {green}[!wave]{default} Turned off.",
+    "Wave.PleaseUseNumber": " {green}[!wave]{default} Please use a number.",
+    "Wave.SpecialCodeAccepted": " {green}[!wave]{default} Special code accepted!",
+    "Wave.OnlyFourPlayers": " {green}[!wave]{default} Only 1-4 players can play.",
+    "Wave.StartingWithOverride": " {green}[!wave]{default} Starting at wave {0} with {1} players!",
+    "Wave.StartingAtWave": " {green}[!wave]{default} Starting at wave {0}!",
+    "Wave.FifthPlayerJoined": " {green}[!wave]{default} A 5th player joined the server. Bot Waves disabled.",
+    "Wave.FifthPlayerJoinedThanks": " {lime}Thanks for helping populate the server! Enjoy the regular AWP gameplay.",
 
-    "Wave.FightBots": " {green}[Bot Wave]{default} Wave {0} - Fight {1} bots!",
-    "Wave.SpawnLimitReached": " {green}[Bot Wave]{default} Only {0} bots fit on map. {1} will re-spawn!",
-    "Wave.NoMoreRespawns": " {green}[Bot Wave]{default} No more bot re-spawns! Kill the rest!",
-    "Wave.RespawnsLeft": " {green}[Bot Wave]{default} Bot re-spawns left: {0}",
-    
-    "Credits.Earned": " {green}[Bot Wave]{default} +{0} credits! Total: {lime}{1} credits",
-    "Credits.NotEnough": " {green}[Bot Wave]{default} Not enough credits! You have {0}, need {1}",
-    "Credits.Balance": " {green}[Bot Wave]{default} You have {lime}{0} credits",
-    
-  "Perk.ShopHelp": " {green}[Bot Wave]{default} Type {lime}!shop{default} to see available perks!",
-    "Perk.ShopMenu": " {green}[Bot Wave]{default} === PERK SHOP === Credits: {lime}{0}{default}{nextline}1. {lime}!armor{default} - Armor + Helmet ({1} credits){nextline}2. {lime}!speed{default} - Speed Boost ({2} credits){nextline}3. {lime}!respawn{default} - Extra Life ({3} credits){nextline}4. {lime}!freeze{default} - Freeze Bomb ({4} credits)",
-    
-    "Perk.ArmorPurchased": " {green}[Bot Wave]{default} Armor purchased! You now have protection.",
-    "Perk.ArmorAlready": " {green}[Bot Wave]{default} You already have armor!",
-    "Perk.SpeedPurchased": " {green}[Bot Wave]{default} Speed boost purchased! You move faster now!",
- "Perk.SpeedAlready": " {green}[Bot Wave]{default} You already have speed boost!",
-    "Perk.RespawnPurchased": " {green}[Bot Wave]{default} Extra life purchased! You have {0} respawns available.",
-    "Perk.FreezePurchased": " {green}[Bot Wave]{default} Freeze bomb purchased! You have {0} freeze bombs. Use {lime}!usefreeze{default} to deploy!",
-    
-    "Perk.RespawnUsed": " {green}[Bot Wave]{default} Extra life used! You have {0} respawns left.",
-    "Perk.NoRespawns": " {green}[Bot Wave]{default} You don't have any extra lives!",
-    "Perk.FreezeUsed": " {green}[Bot Wave]{default} Freeze bomb deployed! All bots frozen for 5 seconds!",
-    "Perk.NoFreeze": " {green}[Bot Wave]{default} You don't have any freeze bombs!",
-    "Perk.FreezeNotInWave": " {green}[Bot Wave]{default} You can only use freeze bombs during wave mode!"
+    "Wave.HelpStart": " {green}[!wave]{default} Type {lime}!wave{default} to start wave mode!",
+    "Wave.HelpCustomWave": " {green}[!wave]{default} Use {lime}!wave <number>{default} to start at a specific wave (e.g., !wave 10)",
+    "Wave.HelpTurnOff": " {green}[!wave]{default} Use {lime}!wave off{default} to disable wave mode",
+
+    "Wave.YouWonNext": " {green}[!wave]{default} You won! Next: Wave {0}",
+  "Wave.YouLostTryAgain": " {green}[!wave]{default} You lost. Try wave {0} again!",
+
+    "Wave.FightBots": " {green}[!wave]{default} Wave {0} - Fight {1} bots!",
+    "Wave.SpawnLimitReached": " {green}[!wave]{default} Only {0} bots fit on map. {1} will re-spawn!",
+    "Wave.NoMoreRespawns": " {green}[!wave]{default} No more bot re-spawns! Kill the rest!",
+    "Wave.RespawnsLeft": " {green}[!wave ]{default} Bot re-spawns left: {0}"
 }
