@@ -1,12 +1,29 @@
-## .:[ Join Our Discord For Support ]:.
+# [CS2] Bot Wave Survival (2.0.1)
 
-<a href="https://discord.com/invite/U7AuQhu"><img src="https://discord.com/api/guilds/651838917687115806/widget.png?style=banner2"></a>
-
-# [CS2] Bot-Quota-GoldKingZ (1.0.4)
-
-Kick / Add Bots Depend How Many Players In The Server
+A cooperative survival mode where 1-4 players fight increasingly difficult waves of bots.
 
 ![bot-quote](https://github.com/user-attachments/assets/c88a8ba3-dfaf-4265-9e22-1a4174370d8d)
+
+---
+
+## 🎮 Features
+
+- **Dynamic Wave Scaling**: Wave difficulty scales with team size
+  - 1 player: +1 bot per wave
+  - 2 players: +2 bots per wave
+  - 3 players: +3 bots per wave
+  - 4 players: +4 bots per wave
+- **Dynamic Round Time**: Round time automatically adjusts based on wave number
+  - Waves 1-10: 40 seconds base time
+  - Waves 11+: +3 seconds per additional bot (e.g., Wave 20 = 70 seconds)
+- **Auto-Respawn System**: When map spawn limits are hit, bots will respawn to reach the target wave count
+- **Admin Override**: Password system to allow unlimited players (password: "glove")
+  - Use `!wave [number] glove` to start with 5+ players
+  - Once override is used, unlimited players can join without disabling wave mode
+  - Override persists until wave mode is manually disabled or map changes
+- **Auto-Disable on Population**: When a 5th player joins during normal mode (no override), wave mode automatically disables with a thank you message
+- **Helpful Command Guide**: Automatic !wave command instructions shown at the start of every round when 1-4 players are present
+- **Comprehensive Configuration**: Over 20 configurable settings for wave mode, round times, bot spawning, messages, and debugging
 
 ---
 
@@ -85,6 +102,17 @@ Kick / Add Bots Depend How Many Players In The Server
 
 <details>
 <summary>📋 View Version History (Click to expand 🔽)</summary>
+
+### [2.0.1]
+- **Update**: Help message feature now implemented
+
+### [2.0.0]
+- **Major Update**: Wave system rework
+- Implemented dynamic wave scaling based on player count
+- Added mid-round join protection
+- Introduced auto-respawn system for bots
+- Milestone celebrations at specific wave intervals
+- Admin override password for 5+ players
 
 ### [1.0.4]
 - Fix Cfg Flood

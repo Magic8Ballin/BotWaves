@@ -1,0 +1,39 @@
+{
+  // ===== Wave Mode Settings =====
+  "MaxPlayersWithoutPassword": 4,
+  "AdminPasswordOverride": "glove",
+  "DisableWaveOnFifthPlayer": true,
+  
+  // ===== Round Time Settings =====
+  "EnableDynamicRoundTime": true,
+  "BaseRoundTimeSeconds": 40,
+  "RoundTimeIncrementPerBot": 3,
+  "WaveThresholdForTimeIncrease": 10,
+  
+  // ===== Bot Spawn Settings =====
+  "SpawnLimitCheckDelay": 1.0,
+  
+  // ===== Wave Scaling Settings =====
+  "EnableDynamicScaling": true,
+  "MinimumWaveIncrement": 1,
+  
+  // ===== Respawn System Settings =====
+  "EnableAutoRespawn": true,
+  "ShowRespawnMessages": true,
+  "ShowRespawnEveryXDeaths": 5,
+  
+  // ===== Chat Messages Settings =====
+  "ShowWaveStartMessages": true,
+  "ShowWaveEndMessages": true,
+  "ShowHelpMessages": true,
+  
+  // ===== Server Protection Settings =====
+  "SaveServerCvars": true,
+  "RestoreCvarsOnDisable": true,
+  
+  // ===== Debug Settings =====
+  "EnableDebugMode": false,
+  "LogBotSpawns": true,
+  "LogTeamChanges": false,
+  "LogRoundEvents": true
+}
