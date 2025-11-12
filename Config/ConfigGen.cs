@@ -2,7 +2,7 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using CounterStrikeSharp.API.Core;
 
-namespace Bot_Quota_GoldKingZ;
+namespace BotWaves;
 
 public class ConfigGen : BasePluginConfig
 {

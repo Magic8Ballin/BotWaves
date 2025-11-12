@@ -1,0 +1,9 @@
+C:\Users\Magic8Ball\source\repos\Bot-Waves\bin\Release\addons\counterstrikesharp\plugins\BotWave\lang\en.json
+C:\Users\Magic8Ball\source\repos\Bot-Waves\bin\Release\addons\counterstrikesharp\plugins\BotWave\BotWave.deps.json
+C:\Users\Magic8Ball\source\repos\Bot-Waves\bin\Release\addons\counterstrikesharp\plugins\BotWave\BotWave.dll
+C:\Users\Magic8Ball\source\repos\Bot-Waves\obj\Debug\BotWave.csproj.AssemblyReference.cache
+C:\Users\Magic8Ball\source\repos\Bot-Waves\obj\Debug\BotWave.GeneratedMSBuildEditorConfig.editorconfig
+C:\Users\Magic8Ball\source\repos\Bot-Waves\obj\Debug\BotWave.csproj.CoreCompileInputs.cache
+C:\Users\Magic8Ball\source\repos\Bot-Waves\obj\Debug\BotWave.dll
+C:\Users\Magic8Ball\source\repos\Bot-Waves\obj\Debug\refint\BotWave.dll
+C:\Users\Magic8Ball\source\repos\Bot-Waves\obj\Debug\ref\BotWave.dll

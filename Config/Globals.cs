@@ -1,7 +1,7 @@
 using CounterStrikeSharp.API.Core;
 using CounterStrikeSharp.API.Modules.Utils;
 
-namespace Bot_Quota_GoldKingZ;
+namespace BotWaves;
 
 public class Globals
 {
