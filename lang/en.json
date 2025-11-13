@@ -2,10 +2,10 @@
     "Wave.TurnedOff": " {green}[!wave]{default} Turned off.",
     "Wave.PleaseUseNumber": " {green}[!wave]{default} Please use a number.",
     "Wave.SpecialCodeAccepted": " {green}[!wave]{default} Special code accepted!",
-    "Wave.OnlyFourPlayers": " {green}[!wave]{default} Only 1-4 players can play.",
+    "Wave.OnlyFourPlayers": " {green}[!wave]{default} Only 1-8 players can play.",
     "Wave.StartingWithOverride": " {green}[!wave]{default} Starting at wave {0} with {1} players!",
     "Wave.StartingAtWave": " {green}[!wave]{default} Starting at wave {0}!",
-    "Wave.FifthPlayerJoined": " {green}[!wave]{default} A 5th player joined the server. Bot Waves disabled.",
+    "Wave.FifthPlayerJoined": " {green}[!wave]{default} A 9th player joined the server. Bot Waves disabled.",
     "Wave.FifthPlayerJoinedThanks": " {lime}Thanks for helping populate the server! Enjoy the regular AWP gameplay.",
 
     "Wave.HelpStart": " {green}[!wave]{default} Type {lime}!wave{default} to start wave mode!",
@@ -16,7 +16,7 @@
     "Wave.YouLostTryAgain": " {green}[!wave]{default} You lost. Try wave {0} again!",
  
     "Wave.FailureCounter": " {red}Wave Failed {0}/{1}",
-    "Wave.DifficultyReduced": " {orange}[!wave]{default} Difficulty reduced! Wave {0} reduced from {1} to {2} bots ({3} removed)",
+    "Wave.DifficultyReduced": " {green}[!wave]{default} Difficulty reduced! Wave {0} reduced from {1} to {2} bots ({3} removed)",
 
     "Wave.FightBots": " {green}[!wave]{default} Wave {0} - Fight {1} bots!",
     "Wave.SpawnLimitReached": " {green}[!wave]{default} Only {0} bots fit on map. {1} will re-spawn!",
