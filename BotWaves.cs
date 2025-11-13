@@ -72,23 +72,19 @@ public class BotWaves : BasePlugin, IPluginConfig<ConfigGen>
 
     private void OnMapStart(string mapName)
     {
-        // Reset wave mode on map change
+        // Reset wave mode on map change and ensure all cvars are cleaned up
         if (g_Main.isWaveModeActive)
         {
-            g_Main.isWaveModeActive = false;
-            g_Main.currentWaveBotCount = 1;
-            g_Main.consecutiveWaveFailures = 0;
+            DisableWaveMode();
         }
     }
 
     private void OnMapEnd()
     {
-        // Clean up wave mode
+        // Clean up wave mode and ensure all cvars are cleaned up
         if (g_Main.isWaveModeActive)
         {
-            g_Main.isWaveModeActive = false;
-            g_Main.currentWaveBotCount = 1;
-            g_Main.consecutiveWaveFailures = 0;
+            DisableWaveMode();
         }
     }
 
