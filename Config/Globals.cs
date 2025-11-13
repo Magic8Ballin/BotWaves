@@ -17,6 +17,10 @@ public class Globals
     // Store the player count from round start to use for wave increment calculation
     public int humanPlayerCountAtRoundStart = 0;
     
+    // Wave failure and difficulty reduction system
+    public int consecutiveWaveFailures = 0; // Track how many times current wave has been failed in a row
+    public const int MaxFailuresBeforeReduction = 7; // After 7 failures, reduce difficulty
+    
     // Auto-respawn system (using mp_respawn_on_death_ct)
     public bool autoRespawnEnabled = false;
     public int respawnsNeeded = 0;

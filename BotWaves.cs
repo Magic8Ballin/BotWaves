@@ -74,14 +74,15 @@ public class BotWaves : BasePlugin, IPluginConfig<ConfigGen>
 
     private void OnMapStart(string mapName)
     {
-        Console.WriteLine($"[Bot Waves] Map started: {mapName}");
+      Console.WriteLine($"[Bot Waves] Map started: {mapName}");
 
         // Reset wave mode on map change
         if (g_Main.isWaveModeActive)
         {
-            Console.WriteLine("[Bot Waves] Map changed - disabling wave mode");
+        Console.WriteLine("[Bot Waves] Map changed - disabling wave mode");
             g_Main.isWaveModeActive = false;
-            g_Main.currentWaveBotCount = 1;
+         g_Main.currentWaveBotCount = 1;
+   g_Main.consecutiveWaveFailures = 0;
         }
     }
 
@@ -92,8 +93,9 @@ public class BotWaves : BasePlugin, IPluginConfig<ConfigGen>
         // Clean up wave mode
         if (g_Main.isWaveModeActive)
         {
-            g_Main.isWaveModeActive = false;
-            g_Main.currentWaveBotCount = 1;
+g_Main.isWaveModeActive = false;
+     g_Main.currentWaveBotCount = 1;
+        g_Main.consecutiveWaveFailures = 0;
         }
     }
 
@@ -162,9 +164,10 @@ public class BotWaves : BasePlugin, IPluginConfig<ConfigGen>
     Console.WriteLine($"[Bot Waves] Override used: {usedOverride}");
 
  g_Main.isWaveModeActive = true;
-        g_Main.currentWaveBotCount = startWave;
+   g_Main.currentWaveBotCount = startWave;
         g_Main.waveModeJustActivated = true;
         g_Main.waveStartedWithOverride = usedOverride;
+        g_Main.consecutiveWaveFailures = 0;
     g_Main.playersAssignedToTeam.Clear();
 
         // Reset respawn system to prevent leftover state
@@ -237,6 +240,7 @@ Console.WriteLine("[Bot Waves] Restarting game to begin wave mode");
         g_Main.respawnsUsed = 0;
         g_Main.waveModeJustActivated = false;
         g_Main.waveStartedWithOverride = false;
+        g_Main.consecutiveWaveFailures = 0;
         g_Main.playersAssignedToTeam.Clear();
 
         // Kill any active timers
@@ -915,9 +919,13 @@ Console.WriteLine("   BOT WAVE - ROUND END DEBUG REPORT");
        {
    Console.WriteLine("[Bot Waves] >>> HUMANS WON! Calculating increment...");
 
+     // RESET failure counter on win
+     g_Main.consecutiveWaveFailures = 0;
+     Console.WriteLine("[Bot Waves] Humans won - reset failure counter to 0");
+
      // Print to client consoles
    foreach (var client in Utilities.GetPlayers().Where(p => p != null && p.IsValid && !p.IsBot && !p.IsHLTV))
-       {
+     {
           client.PrintToConsole("=======================================");
      client.PrintToConsole("  BOT WAVE - INCREMENT DEBUG");
      client.PrintToConsole("=======================================");
@@ -960,7 +968,7 @@ Console.WriteLine("   BOT WAVE - ROUND END DEBUG REPORT");
 
    foreach (var client in Utilities.GetPlayers().Where(p => p != null && p.IsValid && !p.IsBot && !p.IsHLTV))
      {
-          client.PrintToConsole($"Wave: {oldWave} + {increment} = {g_Main.currentWaveBotCount}");
+  client.PrintToConsole($"Wave: {oldWave} + {increment} = {g_Main.currentWaveBotCount}");
     client.PrintToConsole("=======================================");
         }
 
@@ -968,14 +976,52 @@ Console.WriteLine("   BOT WAVE - ROUND END DEBUG REPORT");
      {
          Server.PrintToChatAll(Localizer["Wave.YouWonNext", g_Main.currentWaveBotCount]);
   }
-            }
+     }
     else if (winner == g_Main.botTeam)
             {
       Console.WriteLine($"[Bot Waves] >>> HUMANS LOST. Wave stays at: {g_Main.currentWaveBotCount}");
+   
+      // Increment failure counter
+  g_Main.consecutiveWaveFailures++;
+      Console.WriteLine($"[Bot Waves] Failure counter: {g_Main.consecutiveWaveFailures}/{Globals.MaxFailuresBeforeReduction}");
+      
+      // Show failure counter in RED text
+      Server.PrintToChatAll(Localizer["Wave.FailureCounter", g_Main.consecutiveWaveFailures, Globals.MaxFailuresBeforeReduction]);
+      
+      // Check if we need to reduce difficulty
+      if (g_Main.consecutiveWaveFailures >= Globals.MaxFailuresBeforeReduction)
+      {
+          Console.WriteLine("[Bot Waves] === DIFFICULTY REDUCTION TRIGGERED ===");
+     
+          int oldBotCount = g_Main.currentWaveBotCount;
+          
+          // Calculate 10% reduction (minimum 1 bot)
+          double reductionPercent = oldBotCount * 0.10;
+          int botsToRemove = Math.Max(1, (int)Math.Round(reductionPercent));
+          
+ // Apply reduction
+    g_Main.currentWaveBotCount -= botsToRemove;
+          
+        // Ensure we never go below 1 bot
+if (g_Main.currentWaveBotCount < 1)
+          {
+     g_Main.currentWaveBotCount = 1;
+       }
+          
+       Console.WriteLine($"[Bot Waves] Reduced wave from {oldBotCount} to {g_Main.currentWaveBotCount} bots (removed {botsToRemove})");
+        Console.WriteLine($"[Bot Waves] Calculation: {oldBotCount} * 0.10 = {reductionPercent:F2}, rounded = {botsToRemove}");
+    
+          // Reset failure counter after reduction
+          g_Main.consecutiveWaveFailures = 0;
+   
+      // Show difficulty reduction message
+          Server.PrintToChatAll(Localizer["Wave.DifficultyReduced", g_Main.currentWaveBotCount, oldBotCount, g_Main.currentWaveBotCount, botsToRemove]);
+      }
+      
    Console.WriteLine("===============================================================");
 
      if (Config.ShowWaveEndMessages)
-         {
+       {
    Server.PrintToChatAll(Localizer["Wave.YouLostTryAgain", g_Main.currentWaveBotCount]);
    }
         }

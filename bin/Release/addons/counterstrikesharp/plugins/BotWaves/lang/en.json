@@ -13,7 +13,10 @@
     "Wave.HelpTurnOff": " {green}[!wave]{default} Use {lime}!wave off{default} to disable wave mode",
 
     "Wave.YouWonNext": " {green}[!wave]{default} You won! Next: Wave {0}",
-  "Wave.YouLostTryAgain": " {green}[!wave]{default} You lost. Try wave {0} again!",
+    "Wave.YouLostTryAgain": " {green}[!wave]{default} You lost. Try wave {0} again!",
+ 
+    "Wave.FailureCounter": " {red}Wave Failed {0}/{1}",
+    "Wave.DifficultyReduced": " {orange}[!wave]{default} Difficulty reduced! Wave {0} reduced from {1} to {2} bots ({3} removed)",
 
     "Wave.FightBots": " {green}[!wave]{default} Wave {0} - Fight {1} bots!",
     "Wave.SpawnLimitReached": " {green}[!wave]{default} Only {0} bots fit on map. {1} will re-spawn!",
