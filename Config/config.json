@@ -1,8 +1,12 @@
 {
   // ===== Wave Mode Settings =====
-  "MaxPlayersWithoutPassword": 4,
+  "MaxPlayersWithoutPassword": 5,
   "AdminPasswordOverride": "glove",
   "DisableWaveOnFifthPlayer": true,
+  "DefaultZombieMode": true,
+
+  // ===== Wave Voting Settings =====
+  "WaveVoteThreshold": 0.5,
   
   // ===== Round Time Settings =====
   "EnableDynamicRoundTime": true,
@@ -12,16 +16,17 @@
   
   // ===== Bot Spawn Settings =====
   "SpawnLimitCheckDelay": 1.0,
+  "DefaultBotDifficulty": 3,
   
   // ===== Wave Scaling Settings =====
-  "EnableDynamicScaling": true,
   "MinimumWaveIncrement": 1,
+  "MaxFailuresBeforeReduction": 7,
   
   // ===== Respawn System Settings =====
   "EnableAutoRespawn": true,
   "ShowRespawnMessages": true,
-  "ShowRespawnEveryXDeaths": 5,
-  
+  "ShowRespawnEveryXDeaths": 1,
+
   // ===== Chat Messages Settings =====
   "ShowWaveStartMessages": true,
   "ShowWaveEndMessages": true,
@@ -29,11 +34,5 @@
   
   // ===== Server Protection Settings =====
   "SaveServerCvars": true,
-  "RestoreCvarsOnDisable": true,
-  
-  // ===== Debug Settings =====
-  "EnableDebugMode": false,
-  "LogBotSpawns": true,
-  "LogTeamChanges": false,
-  "LogRoundEvents": true
+  "RestoreCvarsOnDisable": true
 }

@@ -8,7 +8,7 @@ public class ConfigGen : BasePluginConfig
 {
     // ===== Wave Mode Settings =====
     [JsonPropertyName("MaxPlayersWithoutPassword")]
-    public int MaxPlayersWithoutPassword { get; set; } = 4;
+    public int MaxPlayersWithoutPassword { get; set; } = 5;
     
     [JsonPropertyName("AdminPasswordOverride")]
     public string AdminPasswordOverride { get; set; } = "glove";
@@ -18,43 +18,53 @@ public class ConfigGen : BasePluginConfig
     
     [JsonPropertyName("DisableSkillAutoBalanceInWaveMode")]
     public bool DisableSkillAutoBalanceInWaveMode { get; set; } = true;
+    
+    [JsonPropertyName("DefaultZombieMode")]
+    public bool DefaultZombieMode { get; set; } = true;
+    
+    // ===== Wave Voting Settings =====
+    [JsonPropertyName("WaveVoteThreshold")]
+    public float WaveVoteThreshold { get; set; } = 0.5f; // 50% of players needed to vote
   
     // ===== Round Time Settings =====
     [JsonPropertyName("EnableDynamicRoundTime")]
     public bool EnableDynamicRoundTime { get; set; } = true;
     
-[JsonPropertyName("BaseRoundTimeSeconds")]
+    [JsonPropertyName("BaseRoundTimeSeconds")]
     public int BaseRoundTimeSeconds { get; set; } = 40;
     
     [JsonPropertyName("RoundTimeIncrementPerBot")]
     public int RoundTimeIncrementPerBot { get; set; } = 3;
-    
+  
     [JsonPropertyName("WaveThresholdForTimeIncrease")]
     public int WaveThresholdForTimeIncrease { get; set; } = 10;
     
     // ===== Bot Spawn Settings =====
     [JsonPropertyName("SpawnLimitCheckDelay")]
     public float SpawnLimitCheckDelay { get; set; } = 1.0f;
+  
+    [JsonPropertyName("DefaultBotDifficulty")]
+    public int DefaultBotDifficulty { get; set; } = 3; // 2=Easy, 3=Normal, 4=Hard, 5=Nightmare
     
     // ===== Wave Scaling Settings =====
-    [JsonPropertyName("EnableDynamicScaling")]
-    public bool EnableDynamicScaling { get; set; } = true;
-    
-    [JsonPropertyName("MinimumWaveIncrement")]
+  [JsonPropertyName("MinimumWaveIncrement")]
     public int MinimumWaveIncrement { get; set; } = 1;
+    
+    [JsonPropertyName("MaxFailuresBeforeReduction")]
+    public int MaxFailuresBeforeReduction { get; set; } = 7; // Number of consecutive failures before reducing wave difficulty
     
     // ===== Respawn System Settings =====
     [JsonPropertyName("EnableAutoRespawn")]
     public bool EnableAutoRespawn { get; set; } = true;
-    
+ 
     [JsonPropertyName("ShowRespawnMessages")]
     public bool ShowRespawnMessages { get; set; } = true;
     
     [JsonPropertyName("ShowRespawnEveryXDeaths")]
-    public int ShowRespawnEveryXDeaths { get; set; } = 5;
-    
+    public int ShowRespawnEveryXDeaths { get; set; } = 1;
+  
     // ===== Chat Messages Settings =====
-    [JsonPropertyName("ShowWaveStartMessages")]
+[JsonPropertyName("ShowWaveStartMessages")]
     public bool ShowWaveStartMessages { get; set; } = true;
     
     [JsonPropertyName("ShowWaveEndMessages")]
@@ -69,17 +79,4 @@ public class ConfigGen : BasePluginConfig
     
     [JsonPropertyName("RestoreCvarsOnDisable")]
     public bool RestoreCvarsOnDisable { get; set; } = true;
-    
-    // ===== Debug Settings =====
-    [JsonPropertyName("EnableDebugMode")]
-    public bool EnableDebugMode { get; set; } = false;
-    
-    [JsonPropertyName("LogBotSpawns")]
-    public bool LogBotSpawns { get; set; } = true;
-    
-    [JsonPropertyName("LogTeamChanges")]
-    public bool LogTeamChanges { get; set; } = false;
-    
-    [JsonPropertyName("LogRoundEvents")]
-    public bool LogRoundEvents { get; set; } = true;
 }

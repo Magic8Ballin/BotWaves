@@ -1,6 +1,6 @@
-# [CS2] Bot Wave Survival (2.0.1)
+# [CS2] Bot Wave Survival (2.5.0)
 
-A cooperative survival mode where 1-4 players fight increasingly difficult waves of bots.
+A cooperative survival mode where 1-5 players fight increasingly difficult waves of bots.
 
 ![bot-quote](https://github.com/user-attachments/assets/c88a8ba3-dfaf-4265-9e22-1a4174370d8d)
 
@@ -8,24 +8,41 @@ A cooperative survival mode where 1-4 players fight increasingly difficult waves
 
 ## 🎮 Features
 
+- **Wave Voting System**: Democratic voting to enable/disable wave mode
+  - Requires 50% of players to vote (minimum 2 votes)
+  - Solo players can instantly toggle wave mode
+  - Vote threshold recalculates when players join/leave
+- **Bot Difficulty Levels**: Four difficulty presets (Easy, Normal, Hard, Nightmare)
+  - Change difficulty during active waves
+  - Difficulty persists between rounds
+  - Configurable default difficulty
+- **Zombie Mode**: Bots spawn with knives only for intense melee combat
+  - Toggle on/off during active waves
+  - Can be enabled by default via config
+  - Separate from difficulty settings
 - **Dynamic Wave Scaling**: Wave difficulty scales with team size
   - Minimum increment per wave: configurable (default +1)
   - Actual increment: Max(MinimumWaveIncrement, Number of Players)
   - Example: 3 players will increment by 3 bots per wave
+- **Auto-Failure Reduction**: Automatic wave difficulty reduction after repeated failures
+  - Configurable failure threshold (default: 7 consecutive failures)
+  - 10% bot reduction per trigger (minimum 1 bot)
+  - Visual failure counter displayed to players
 - **Dynamic Round Time**: Round time automatically adjusts based on wave number
-  - Configurable base time (default: 115 seconds)
+  - Configurable base time (default: 40 seconds)
   - Configurable increment per bot after threshold (default: +3s per bot after wave 10)
-  - Example: Wave 20 with 10+ threshold = 115s + (10 bots × 3s) = 145 seconds
+  - Example: Wave 20 with 10+ threshold = 40s + (10 bots × 3s) = 70 seconds
 - **Auto-Respawn System**: When map spawn limits are hit, bots will respawn to reach the target wave count
 - **Admin Override**: Password system to allow unlimited players
   - Use `!wave [number] [password]` to start with 5+ players
-  - Once override is used, unlimited players can join without disabling wave mode
+- Once override is used, unlimited players can join without disabling wave mode
   - Override persists until wave mode is manually disabled or map changes
-- **Auto-Disable on Population**: When a 5th player joins during normal mode (no override), wave mode automatically disables with a thank you message
-- **Helpful Command Guide**: Automatic !wave command instructions shown at the start of every round when 1-4 players are present
+- **Auto-Disable on Population**: When a 6th player joins during normal mode (no override), wave mode automatically disables with a thank you message
+- **Helpful Command Guide**: Automatic !wave command instructions shown every 120 seconds when wave mode is inactive
 - **Team Management**: Humans automatically placed on T side, bots on CT side
 - **Server Protection**: Optional saving and restoration of server cvars when wave mode is enabled/disabled
-- **Comprehensive Configuration**: Over 20 configurable settings for wave mode, round times, bot spawning, messages, and debugging
+- **Round Statistics**: Player kill counts displayed at end of each round
+- **Comprehensive Configuration**: Over 15 configurable settings for wave mode, round times, bot spawning, messages, and more
 
 ---
 
@@ -48,13 +65,32 @@ A cooperative survival mode where 1-4 players fight increasingly difficult waves
 
 ## 🎯 Commands
 
+### Core Commands
+
 | Command | Description | Usage |
 |---------|-------------|-------|
-| `!wave` or `!wave 1` | Start wave mode at wave 1 | `!wave` |
-| `!wave <number>` | Start wave mode at specific wave | `!wave 10` |
-| `!wave <number> <password>` | Start wave mode with admin override for 5+ players | `!wave 10 yourpassword` |
-| `!wave off` | Disable wave mode | `!wave off` |
-| `!wave disable` | Disable wave mode (alternative) | `!wave disable` |
+| `!wave` or `wave` | Vote to enable/disable wave mode | Type in chat |
+| `!wave <number>` | Start/change to specific wave | `!wave 10` |
+| `!wave <number> <difficulty>` | Start wave with specific difficulty | `!wave 10 hard` |
+| `!wave <number> <password>` | Start wave with admin override (5+ players) | `!wave 10 glove` |
+| `!wave help` | Show command help | `!wave help` |
+| `!wave off` | Show voting instructions | `!wave off` |
+
+### Difficulty Commands
+
+| Command | Description | Usage |
+|---------|-------------|-------|
+| `!wave easy` | Set bot difficulty to Easy (requires active wave) | `!wave easy` |
+| `!wave normal` | Set bot difficulty to Normal (requires active wave) | `!wave normal` |
+| `!wave hard` | Set bot difficulty to Hard (requires active wave) | `!wave hard` |
+| `!wave nightmare` | Set bot difficulty to Nightmare (requires active wave) | `!wave nightmare` |
+
+### Special Mode Commands
+
+| Command | Description | Usage |
+|---------|-------------|-------|
+| `!z` or `!zombie` | Toggle zombie mode (bots with knives only) | `!z` |
+| `!waveoff` | Show voting instructions to disable wave mode | `!waveoff` |
 
 > [!NOTE]
 > All commands are CLIENT_ONLY and must be used by a player in-game.
@@ -70,16 +106,24 @@ A cooperative survival mode where 1-4 players fight increasingly difficult waves
 
 | Property | Description | Default | Type |
 |----------|-------------|---------|------|
-| `MaxPlayersWithoutPassword` | Maximum players allowed without admin password | `4` | Integer |
+| `MaxPlayersWithoutPassword` | Maximum players allowed without admin password | `5` | Integer |
 | `AdminPasswordOverride` | Password to bypass player limit | `"glove"` | String |
-| `DisableWaveOnFifthPlayer` | Auto-disable wave mode when 5th player joins (without override) | `true` | Boolean |
+| `DisableWaveOnFifthPlayer` | Auto-disable wave mode when 6th player joins (without override) | `true` | Boolean |
+| `DefaultZombieMode` | Enable zombie mode by default when starting wave mode | `true` | Boolean |
+| `DisableSkillAutoBalanceInWaveMode` | Disable Skill Auto Balance plugin during wave mode | `true` | Boolean |
+
+### Wave Voting Settings
+
+| Property | Description | Default | Type |
+|----------|-------------|---------|------|
+| `WaveVoteThreshold` | Percentage of players needed to pass vote (0.0-1.0) | `0.5` | Float |
 
 ### Round Time Settings
 
 | Property | Description | Default | Type |
 |----------|-------------|---------|------|
 | `EnableDynamicRoundTime` | Enable automatic round time adjustment based on wave | `true` | Boolean |
-| `BaseRoundTimeSeconds` | Base round time in seconds | `115` | Integer |
+| `BaseRoundTimeSeconds` | Base round time in seconds | `40` | Integer |
 | `RoundTimeIncrementPerBot` | Additional seconds per bot after threshold | `3` | Integer |
 | `WaveThresholdForTimeIncrease` | Wave number where time increment starts | `10` | Integer |
 
@@ -87,14 +131,15 @@ A cooperative survival mode where 1-4 players fight increasingly difficult waves
 
 | Property | Description | Default | Type |
 |----------|-------------|---------|------|
-| `SpawnLimitCheckDelay` | Delay in seconds before checking spawn limits | `2.0` | Float |
+| `SpawnLimitCheckDelay` | Delay in seconds before checking spawn limits | `1.0` | Float |
+| `DefaultBotDifficulty` | Default bot difficulty level (2=Easy, 3=Normal, 4=Hard, 5=Nightmare) | `3` | Integer |
 
 ### Wave Scaling Settings
 
 | Property | Description | Default | Type |
 |----------|-------------|---------|------|
-| `EnableDynamicScaling` | Enable dynamic wave scaling (currently unused) | `true` | Boolean |
 | `MinimumWaveIncrement` | Minimum bots to add per wave victory | `1` | Integer |
+| `MaxFailuresBeforeReduction` | Consecutive failures before reducing wave difficulty | `7` | Integer |
 
 ### Respawn System Settings
 
@@ -216,6 +261,47 @@ When a map's bot limit is reached:
 <details>
 <summary>📋 View Version History (Click to expand 🔽)</summary>
 
+### [2.5.0] - Code Cleanup & Optimization
+- **Removed**: Dead code (PlayerPerks system, unused tracking variables)
+- **Removed**: Unused configuration options (EnableDynamicScaling, debug logging options)
+- **Removed**: Duplicate command handlers (css_wavestop, individual difficulty commands)
+- **Improved**: Cvar save/restore system with better documentation
+- **Added**: Named constants for magic numbers (improved code readability)
+- **Added**: Configuration validation (DefaultBotDifficulty, MaxFailuresBeforeReduction)
+- **Fixed**: Timer naming standardized to C# conventions
+- **Fixed**: MaxFailuresBeforeReduction now configurable instead of hardcoded
+- **Optimized**: Removed redundant code paths and duplicate logic
+
+### [2.4.0] - Zombie Mode & Enhanced Commands
+- **Added**: Zombie mode - bots spawn with knives only
+- **Added**: `!z` and `!zombie` commands to toggle zombie mode
+- **Added**: DefaultZombieMode configuration option
+- **Updated**: Command help system with mode information
+- **Fixed**: Various command handling improvements
+
+### [2.3.0] - Bot Difficulty System
+- **Added**: Four bot difficulty presets (Easy, Normal, Hard, Nightmare)
+- **Added**: Difficulty commands: `!wave easy/normal/hard/nightmare`
+- **Added**: Mid-wave difficulty changing
+- **Added**: DefaultBotDifficulty configuration option
+- **Updated**: Difficulty displayed on wave start
+- **Fixed**: Bot difficulty persistence between rounds
+
+### [2.2.0] - Wave Voting System
+- **Added**: Democratic voting system to enable/disable wave mode
+- **Added**: Configurable vote threshold (default 50%)
+- **Added**: Minimum 2 votes required for fairness
+- **Added**: Auto-recalculation when players join/leave
+- **Added**: Solo player instant toggle
+- **Updated**: Chat listener for "wave" and "!wave" messages
+- **Fixed**: Vote clearing on player disconnect
+
+### [2.1.0] - Auto-Failure Reduction
+- **Added**: Automatic wave difficulty reduction after repeated failures
+- **Added**: Visual failure counter displayed to players
+- **Added**: Configurable failure threshold
+- **Improved**: Better feedback on wave difficulty changes
+
 ### [2.0.1]
 - **Update**: Help message feature now implemented
 - **Update**: Dynamic round time system fully functional
@@ -279,7 +365,5 @@ When a map's bot limit is reached:
 ## 📝 Credits
 
 **Author**: Gold KingZ  
-**Version**: 2.0.1  
+**Version**: 2.5.0  
 **Plugin Type**: CounterStrikeSharp Plugin  
-
----
