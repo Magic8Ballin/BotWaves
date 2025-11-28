@@ -43,15 +43,21 @@ public class ConfigGen : BasePluginConfig
     [JsonPropertyName("SpawnLimitCheckDelay")]
     public float SpawnLimitCheckDelay { get; set; } = 1.0f;
   
-    [JsonPropertyName("DefaultBotDifficulty")]
-    public int DefaultBotDifficulty { get; set; } = 3; // 2=Easy, 3=Normal, 4=Hard, 5=Nightmare
+    [JsonPropertyName("BotDifficultyChangeDelay")]
+    public float BotDifficultyChangeDelay { get; set; } = 0.15f;
     
     // ===== Wave Scaling Settings =====
-  [JsonPropertyName("MinimumWaveIncrement")]
+    [JsonPropertyName("MinimumWaveIncrement")]
     public int MinimumWaveIncrement { get; set; } = 1;
+
+    [JsonPropertyName("MinimumBotsPerWave")]
+    public int MinimumBotsPerWave { get; set; } = 1;
     
     [JsonPropertyName("MaxFailuresBeforeReduction")]
     public int MaxFailuresBeforeReduction { get; set; } = 7; // Number of consecutive failures before reducing wave difficulty
+    
+    [JsonPropertyName("WaveReductionPercentage")]
+    public int WaveReductionPercentage { get; set; } = 10; // Percentage of bots to remove on reduction (1-100)
     
     // ===== Respawn System Settings =====
     [JsonPropertyName("EnableAutoRespawn")]
@@ -60,11 +66,11 @@ public class ConfigGen : BasePluginConfig
     [JsonPropertyName("ShowRespawnMessages")]
     public bool ShowRespawnMessages { get; set; } = true;
     
-    [JsonPropertyName("ShowRespawnEveryXDeaths")]
+  [JsonPropertyName("ShowRespawnEveryXDeaths")]
     public int ShowRespawnEveryXDeaths { get; set; } = 1;
   
-    // ===== Chat Messages Settings =====
-[JsonPropertyName("ShowWaveStartMessages")]
+  // ===== Chat Messages Settings =====
+    [JsonPropertyName("ShowWaveStartMessages")]
     public bool ShowWaveStartMessages { get; set; } = true;
     
     [JsonPropertyName("ShowWaveEndMessages")]
@@ -73,10 +79,27 @@ public class ConfigGen : BasePluginConfig
     [JsonPropertyName("ShowHelpMessages")]
     public bool ShowHelpMessages { get; set; } = true;
     
+    [JsonPropertyName("HelpMessageInterval")]
+    public int HelpMessageInterval { get; set; } = 60; // Seconds between help messages
+    
+    // ===== Bot Quota Toggle Settings =====
+    [JsonPropertyName("EnableBotQuotaToggle")]
+    public bool EnableBotQuotaToggle { get; set; } = true;
+    
+    [JsonPropertyName("BotQuotaNormal")]
+    public int BotQuotaNormal { get; set; } = 2;
+    
+    [JsonPropertyName("BotQuotaDisabled")]
+    public int BotQuotaDisabled { get; set; } = 0;
+    
     // ===== Server Protection Settings =====
     [JsonPropertyName("SaveServerCvars")]
-    public bool SaveServerCvars { get; set; } = true;
-    
+  public bool SaveServerCvars { get; set; } = true;
+
     [JsonPropertyName("RestoreCvarsOnDisable")]
     public bool RestoreCvarsOnDisable { get; set; } = true;
+    
+    // ===== Player Management Settings =====
+    [JsonPropertyName("DisconnectCheckDelay")]
+    public float DisconnectCheckDelay { get; set; } = 0.5f;
 }

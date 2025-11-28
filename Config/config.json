@@ -3,6 +3,7 @@
   "MaxPlayersWithoutPassword": 5,
   "AdminPasswordOverride": "glove",
   "DisableWaveOnFifthPlayer": true,
+  "DisableSkillAutoBalanceInWaveMode": true,
   "DefaultZombieMode": true,
 
   // ===== Wave Voting Settings =====
@@ -16,11 +17,13 @@
   
   // ===== Bot Spawn Settings =====
   "SpawnLimitCheckDelay": 1.0,
-  "DefaultBotDifficulty": 3,
+  "BotDifficultyChangeDelay": 0.15,
   
   // ===== Wave Scaling Settings =====
   "MinimumWaveIncrement": 1,
+  "MinimumBotsPerWave": 1,
   "MaxFailuresBeforeReduction": 7,
+  "WaveReductionPercentage": 10,
   
   // ===== Respawn System Settings =====
   "EnableAutoRespawn": true,
@@ -31,8 +34,17 @@
   "ShowWaveStartMessages": true,
   "ShowWaveEndMessages": true,
   "ShowHelpMessages": true,
+  "HelpMessageInterval": 60,
+  
+  // ===== Bot Quota Toggle Settings =====
+  "EnableBotQuotaToggle": true,
+  "BotQuotaNormal": 2,
+  "BotQuotaDisabled": 0,
   
   // ===== Server Protection Settings =====
   "SaveServerCvars": true,
-  "RestoreCvarsOnDisable": true
+  "RestoreCvarsOnDisable": true,
+  
+  // ===== Player Management Settings =====
+  "DisconnectCheckDelay": 0.5
 }

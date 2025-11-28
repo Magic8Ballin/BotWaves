@@ -16,12 +16,6 @@ public class BotWaves : BasePlugin, IPluginConfig<ConfigGen>
     public override string ModuleAuthor => "Gold KingZ & Magic8Ball";
     public override string ModuleDescription => "Bot Wave survival mode for 1-5 players";
 
-    // Constants
-    private const float DISCONNECT_CHECK_DELAY = 0.5f;  // Delay before checking player count after disconnect
-    private const float BOT_DIFFICULTY_CHANGE_DELAY = 0.15f;  // Delay for bot kick/respawn when changing difficulty
-    private const double WAVE_REDUCTION_PERCENTAGE = 0.10;  // 10% reduction on repeated failures
-    private const int HELP_MESSAGE_INTERVAL = 120;  // Seconds between help messages
-
     public static BotWaves? Instance { get; private set; }
     public Globals g_Main = new();
     public ConfigGen Config { get; set; } = new();
@@ -30,18 +24,81 @@ public class BotWaves : BasePlugin, IPluginConfig<ConfigGen>
     {
         Config = config;
 
-        // Validate and clamp bot difficulty to valid range (2-5)
-        if (Config.DefaultBotDifficulty < 2 || Config.DefaultBotDifficulty > 5)
+        // Validate WaveVoteThreshold (0.0 - 1.0)
+        if (Config.WaveVoteThreshold < 0.0f || Config.WaveVoteThreshold > 1.0f)
         {
-            Console.WriteLine($"[Bot Waves] Warning: DefaultBotDifficulty ({Config.DefaultBotDifficulty}) is invalid. Clamping to range [2-5].");
-            Config.DefaultBotDifficulty = Math.Clamp(Config.DefaultBotDifficulty, 2, 5);
+            Console.WriteLine($"[Bot Waves] Warning: WaveVoteThreshold ({Config.WaveVoteThreshold}) is invalid. Clamping to range [0.0-1.0].");
+            Config.WaveVoteThreshold = Math.Clamp(Config.WaveVoteThreshold, 0.0f, 1.0f);
         }
 
-        // Validate MaxFailuresBeforeReduction is at least 1
+        // Validate MaxPlayersWithoutPassword (>= 1)
+        if (Config.MaxPlayersWithoutPassword < 1)
+        {
+            Console.WriteLine($"[Bot Waves] Warning: MaxPlayersWithoutPassword ({Config.MaxPlayersWithoutPassword}) is invalid. Setting to minimum value of 1.");
+            Config.MaxPlayersWithoutPassword = 1;
+        }
+
+        // Validate MinimumWaveIncrement (>= 1)
+        if (Config.MinimumWaveIncrement < 1)
+        {
+            Console.WriteLine($"[Bot Waves] Warning: MinimumWaveIncrement ({Config.MinimumWaveIncrement}) is invalid. Setting to minimum value of 1.");
+            Config.MinimumWaveIncrement = 1;
+        }
+
+        // Validate MinimumBotsPerWave (>= 1)
+        if (Config.MinimumBotsPerWave < 1)
+        {
+            Console.WriteLine($"[Bot Waves] Warning: MinimumBotsPerWave ({Config.MinimumBotsPerWave}) is invalid. Setting to minimum value of 1.");
+            Config.MinimumBotsPerWave = 1;
+        }
+
+        // Validate MaxFailuresBeforeReduction (>= 1)
         if (Config.MaxFailuresBeforeReduction < 1)
         {
             Console.WriteLine($"[Bot Waves] Warning: MaxFailuresBeforeReduction ({Config.MaxFailuresBeforeReduction}) is invalid. Setting to minimum value of 1.");
             Config.MaxFailuresBeforeReduction = 1;
+        }
+
+        // Validate WaveReductionPercentage (1-100)
+        if (Config.WaveReductionPercentage < 1 || Config.WaveReductionPercentage > 100)
+        {
+            Console.WriteLine($"[Bot Waves] Warning: WaveReductionPercentage ({Config.WaveReductionPercentage}) is invalid. Clamping to range [1-100].");
+            Config.WaveReductionPercentage = Math.Clamp(Config.WaveReductionPercentage, 1, 100);
+        }
+
+        // Validate BaseRoundTimeSeconds (> 0)
+        if (Config.BaseRoundTimeSeconds <= 0)
+        {
+            Console.WriteLine($"[Bot Waves] Warning: BaseRoundTimeSeconds ({Config.BaseRoundTimeSeconds}) is invalid. Setting to default value of 40.");
+            Config.BaseRoundTimeSeconds = 40;
+        }
+
+        // Validate HelpMessageInterval (> 0)
+        if (Config.HelpMessageInterval <= 0)
+        {
+            Console.WriteLine($"[Bot Waves] Warning: HelpMessageInterval ({Config.HelpMessageInterval}) is invalid. Setting to default value of 60.");
+            Config.HelpMessageInterval = 60;
+        }
+
+        // Validate ShowRespawnEveryXDeaths (>= 1)
+        if (Config.ShowRespawnEveryXDeaths < 1)
+        {
+            Console.WriteLine($"[Bot Waves] Warning: ShowRespawnEveryXDeaths ({Config.ShowRespawnEveryXDeaths}) is invalid. Setting to minimum value of 1.");
+            Config.ShowRespawnEveryXDeaths = 1;
+        }
+
+        // Validate BotQuotaNormal (>= 0)
+        if (Config.BotQuotaNormal < 0)
+        {
+            Console.WriteLine($"[Bot Waves] Warning: BotQuotaNormal ({Config.BotQuotaNormal}) is invalid. Setting to default value of 2.");
+            Config.BotQuotaNormal = 2;
+        }
+
+        // Validate BotQuotaDisabled (>= 0)
+        if (Config.BotQuotaDisabled < 0)
+        {
+            Console.WriteLine($"[Bot Waves] Warning: BotQuotaDisabled ({Config.BotQuotaDisabled}) is invalid. Setting to minimum value of 0.");
+            Config.BotQuotaDisabled = 0;
         }
     }
 
@@ -50,6 +107,11 @@ public class BotWaves : BasePlugin, IPluginConfig<ConfigGen>
         try
         {
             Instance = this;
+
+            Console.WriteLine($"===========================================");
+            Console.WriteLine($"[Bot Waves] VERSION 2.5.0-DEBUG-FIX3 LOADING");
+            Console.WriteLine($"[Bot Waves] If you see this, the new code IS running!");
+            Console.WriteLine($"===========================================");
 
             // Register listeners for map events
             RegisterListener<Listeners.OnMapStart>(OnMapStart);
@@ -68,10 +130,10 @@ public class BotWaves : BasePlugin, IPluginConfig<ConfigGen>
             AddCommandListener("say", OnPlayerSay);
             AddCommandListener("say_team", OnPlayerSay);
 
-            // Start help message timer (every 120 seconds)
+            // Start help message timer using config interval
             if (Config.ShowHelpMessages)
             {
-                g_Main._helpMessageTimer = AddTimer(HELP_MESSAGE_INTERVAL, ShowHelpMessagesIfNeeded, TimerFlags.REPEAT);
+                g_Main._helpMessageTimer = AddTimer(Config.HelpMessageInterval, ShowHelpMessagesIfNeeded, TimerFlags.REPEAT);
             }
         }
         catch (Exception ex)
@@ -113,18 +175,29 @@ public class BotWaves : BasePlugin, IPluginConfig<ConfigGen>
     }
 
     [ConsoleCommand("css_wave", "Enable/disable Bot Wave mode")]
-    [CommandHelper(minArgs: 0, usage: "[number|off|disable|easy|normal|hard|nightmare|help] [difficulty|password]", whoCanExecute: CommandUsage.CLIENT_ONLY)]
+    [CommandHelper(minArgs: 0, usage: "[number|off|disable|help] [password]", whoCanExecute: CommandUsage.CLIENT_ONLY)]
     public void OnWaveCommand(CCSPlayerController? player, CommandInfo commandInfo)
     {
-        if (player == null || !player.IsValid) return;
+        Console.WriteLine($"[Bot Waves] OnWaveCommand ENTRY - Player: {player?.PlayerName ?? "NULL"}");
+        
+        if (player == null || !player.IsValid)
+        {
+            Console.WriteLine($"[Bot Waves] OnWaveCommand - Player is null or invalid, returning");
+            return;
+        }
 
         try
         {
             string arg = commandInfo.ArgCount > 1 ? commandInfo.GetArg(1).ToLower() : "";
 
-            // If no arguments provided, ignore (voting is handled by chat listener)
+            Console.WriteLine($"[Bot Waves] OnWaveCommand called by {player.PlayerName}, ArgCount: {commandInfo.ArgCount}, Arg: '{arg}'");
+
+            // If no arguments provided, trigger wave vote (same as typing "wave" in chat)
             if (string.IsNullOrEmpty(arg))
             {
+                Console.WriteLine($"[Bot Waves] No arguments provided, calling HandleWaveVote");
+                HandleWaveVote(player);
+                Console.WriteLine($"[Bot Waves] HandleWaveVote completed, returning");
                 return;
             }
 
@@ -133,20 +206,6 @@ public class BotWaves : BasePlugin, IPluginConfig<ConfigGen>
             {
                 player.PrintToChat(Localizer["Wave.Help.Vote"]);
                 player.PrintToChat(Localizer["Wave.Help.Config"]);
-                player.PrintToChat(Localizer["Wave.Help.Modes"]);
-                return;
-            }
-
-            // Handle difficulty keywords (requires wave mode active)
-            if (arg == "easy" || arg == "normal" || arg == "hard" || arg == "nightmare")
-            {
-                if (!g_Main.isWaveModeActive)
-                {
-                    player.PrintToChat(Localizer["Wave.ZombieNeedWaveActive"]);
-                    return;
-                }
-
-                ChangeBotDifficulty(arg);
                 return;
             }
 
@@ -170,21 +229,15 @@ public class BotWaves : BasePlugin, IPluginConfig<ConfigGen>
 
             int humanPlayerCount2 = GetHumanPlayerCount();
 
-            // Check for difficulty or password in second argument
+            // Check for password in second argument
             bool hasOverride = false;
-            int? difficulty = null;
 
             if (commandInfo.ArgCount > 2)
             {
                 string secondArg = commandInfo.GetArg(2).ToLower();
 
-                // Check if it's a difficulty keyword first
-                if (secondArg == "easy" || secondArg == "normal" || secondArg == "hard" || secondArg == "nightmare")
-                {
-                    difficulty = GetDifficultyValue(secondArg);
-                }
-                // Then check if it's a password
-                else if (secondArg == Config.AdminPasswordOverride)
+                // Check if it's a password
+                if (secondArg == Config.AdminPasswordOverride)
                 {
                     hasOverride = true;
                     player.PrintToChat(Localizer["Wave.SpecialCodeAccepted"]);
@@ -197,20 +250,9 @@ public class BotWaves : BasePlugin, IPluginConfig<ConfigGen>
                 g_Main.currentWaveBotCount = waveNumber;
                 g_Main.consecutiveWaveFailures = 0;
 
-                // Apply difficulty if specified
-                if (difficulty.HasValue)
-                {
-                    g_Main.currentBotDifficulty = difficulty.Value;
-                    SetBotDifficulty(g_Main.currentBotDifficulty);
-                }
-
                 Server.ExecuteCommand("mp_restartgame 1");
-                Server.PrintToChatAll(Localizer["Wave.StartingAtWave", waveNumber]);
-
-                if (difficulty.HasValue)
-                {
-                    Server.PrintToChatAll(Localizer["Wave.DifficultySet", GetDifficultyName(difficulty.Value)]);
-                }
+                string difficulty = GetDifficultyName();
+                Server.PrintToChatAll(Localizer["Wave.StartingAtWave", waveNumber, difficulty]);
 
                 return;
             }
@@ -223,7 +265,7 @@ public class BotWaves : BasePlugin, IPluginConfig<ConfigGen>
             }
 
             // Start wave mode with password override (bypass voting)
-            EnableWaveMode(waveNumber, hasOverride, difficulty);
+            EnableWaveMode(waveNumber, hasOverride);
 
             // Show appropriate message based on override usage
             if (hasOverride && humanPlayerCount2 > Config.MaxPlayersWithoutPassword)
@@ -237,33 +279,37 @@ public class BotWaves : BasePlugin, IPluginConfig<ConfigGen>
         }
     }
 
-    private void EnableWaveMode(int startWave, bool usedOverride = false, int? difficulty = null)
+    private void EnableWaveMode(int startWave, bool usedOverride = false)
     {
-        g_Main.isWaveModeActive = true;
+        Console.WriteLine($"[Bot Waves] EnableWaveMode CALLED - StartWave: {startWave}, UsedOverride: {usedOverride}");
+        
+     g_Main.isWaveModeActive = true;
         g_Main.currentWaveBotCount = startWave;
         g_Main.waveModeJustActivated = true;
-        g_Main.waveStartedWithOverride = usedOverride;
+   g_Main.waveStartedWithOverride = usedOverride;
         g_Main.consecutiveWaveFailures = 0;
-        g_Main.playersAssignedToTeam.Clear();
-        g_Main.waveVoteParticipants.Clear(); // Clear votes when wave mode starts
+     g_Main.playersAssignedToTeam.Clear();
+   g_Main.waveVoteParticipants.Clear(); // Clear votes when wave mode starts
 
-        // Set bot difficulty (use provided difficulty or config default)
-        g_Main.currentBotDifficulty = difficulty ?? Config.DefaultBotDifficulty;
-        SetBotDifficulty(g_Main.currentBotDifficulty);
+   Console.WriteLine($"[Bot Waves] Wave mode state set, DefaultZombieMode: {Config.DefaultZombieMode}");
 
-        // Enable zombie mode by default if no difficulty was specified and config allows it
-        // If difficulty IS specified, user is choosing challenge level, so NO zombie mode
-        if (Config.DefaultZombieMode && !difficulty.HasValue)
+        // Set bot mode based on DefaultZombieMode config
+        if (Config.DefaultZombieMode)
         {
-            g_Main.isZombieModeActive = true;
-            Server.ExecuteCommand("bot_knives_only 1");
-        }
+         g_Main.isZombieModeActive = true;
+       Server.ExecuteCommand("bot_difficulty 1");
+ Server.ExecuteCommand("bot_knives_only 1");
+     }
         else
-        {
-            g_Main.isZombieModeActive = false;
-            Server.ExecuteCommand("bot_knives_only 0");
-            Server.ExecuteCommand("bot_all_weapons 1");
+  {
+      g_Main.isZombieModeActive = false;
+    Server.ExecuteCommand("bot_difficulty 5");
+  Server.ExecuteCommand("bot_knives_only 0");
+  Server.ExecuteCommand("bot_all_weapons 1");
         }
+
+        // Disable auto-adjust bot difficulty
+        Server.ExecuteCommand("sv_auto_adjust_bot_difficulty false");
 
         // Reset respawn system to prevent leftover state
         g_Main.autoRespawnEnabled = false;
@@ -312,8 +358,8 @@ public class BotWaves : BasePlugin, IPluginConfig<ConfigGen>
         // Restart game to immediately start wave mode
         Server.ExecuteCommand("mp_restartgame 1");
 
-        Server.PrintToChatAll(Localizer["Wave.StartingAtWave", startWave]);
-        Server.PrintToChatAll(Localizer["Wave.DifficultySet", GetDifficultyName(g_Main.currentBotDifficulty)]);
+    string difficulty = GetDifficultyName();
+        Server.PrintToChatAll(Localizer["Wave.StartingAtWave", startWave, difficulty]);
     }
 
     private void ToggleZombieMode()
@@ -322,13 +368,15 @@ public class BotWaves : BasePlugin, IPluginConfig<ConfigGen>
 
         if (g_Main.isZombieModeActive)
         {
-            // Enable zombie mode - bots only have knives
+            // Enable zombie mode - bots only have knives + difficulty 1
+            Server.ExecuteCommand("bot_difficulty 1");
             Server.ExecuteCommand("bot_knives_only 1");
             Server.PrintToChatAll(Localizer["Wave.ZombieEnabled"]);
         }
         else
         {
-            // Disable zombie mode - bots have normal weapons
+            // Disable zombie mode - bots have normal weapons + difficulty 5 (hard)
+            Server.ExecuteCommand("bot_difficulty 5");
             Server.ExecuteCommand("bot_knives_only 0");
             Server.ExecuteCommand("bot_all_weapons 1");
             Server.PrintToChatAll(Localizer["Wave.ZombieDisabled"]);
@@ -343,7 +391,6 @@ public class BotWaves : BasePlugin, IPluginConfig<ConfigGen>
         g_Main.isWaveModeActive = false;
         g_Main.isZombieModeActive = false;
         g_Main.currentWaveBotCount = 1;
-        g_Main.currentBotDifficulty = Config.DefaultBotDifficulty;
         g_Main.autoRespawnEnabled = false;
         g_Main.respawnsNeeded = 0;
         g_Main.respawnsUsed = 0;
@@ -433,50 +480,52 @@ public class BotWaves : BasePlugin, IPluginConfig<ConfigGen>
     {
         try
         {
-            var aliveCTBots = Utilities.GetPlayers().Count(p => p != null && p.IsValid && p.IsBot && !p.IsHLTV && p.Team == g_Main.botTeam);
+  var aliveCTBots = Utilities.GetPlayers().Count(p => p != null && p.IsValid && p.IsBot && !p.IsHLTV && p.Team == g_Main.botTeam);
 
-            if (aliveCTBots < waveTarget)
-            {
-                // Hit spawn limit! Enable auto-respawn
-                if (Config.EnableAutoRespawn)
-                {
-                    g_Main.respawnsNeeded = waveTarget - aliveCTBots;
-                    g_Main.respawnsUsed = 0;
-                    g_Main.autoRespawnEnabled = true;
+          string difficulty = GetDifficultyName();
 
-                    Server.ExecuteCommand("mp_respawn_on_death_ct 1");
+ if (aliveCTBots < waveTarget)
+ {
+     // Hit spawn limit! Enable auto-respawn
+     if (Config.EnableAutoRespawn)
+              {
+      g_Main.respawnsNeeded = waveTarget - aliveCTBots;
+          g_Main.respawnsUsed = 0;
+          g_Main.autoRespawnEnabled = true;
 
-                    if (Config.ShowWaveStartMessages)
-                    {
-                        Server.PrintToChatAll(Localizer["Wave.FightBots", waveTarget]);
-                        Server.PrintToChatAll(Localizer["Wave.SpawnLimitReached", aliveCTBots, g_Main.respawnsNeeded]);
-                    }
+     Server.ExecuteCommand("mp_respawn_on_death_ct 1");
+
+         if (Config.ShowWaveStartMessages)
+           {
+    Server.PrintToChatAll(Localizer["Wave.FightBots", waveTarget, difficulty]);
+          Server.PrintToChatAll(Localizer["Wave.SpawnLimitReached", aliveCTBots, g_Main.respawnsNeeded]);
+              }
                 }
-                else
-                {
-                    if (Config.ShowWaveStartMessages)
-                    {
-                        Server.PrintToChatAll(Localizer["Wave.FightBots", aliveCTBots]);
-                    }
-                }
-            }
-            else
+         else
+           {
+            if (Config.ShowWaveStartMessages)
+             {
+  Server.PrintToChatAll(Localizer["Wave.FightBots", aliveCTBots, difficulty]);
+         }
+     }
+    }
+       else
             {
-                // Normal wave, all bots spawned
+    // Normal wave, all bots spawned
                 if (Config.ShowWaveStartMessages)
                 {
-                    Server.PrintToChatAll(Localizer["Wave.FightBots", waveTarget]);
-                }
+ Server.PrintToChatAll(Localizer["Wave.FightBots", waveTarget, difficulty]);
+            }
             }
 
             // Clear the just activated flag - bots are confirmed spawned and wave is truly running
-            if (g_Main.waveModeJustActivated)
-            {
-                g_Main.waveModeJustActivated = false;
+          if (g_Main.waveModeJustActivated)
+{
+   g_Main.waveModeJustActivated = false;
             }
         }
         catch (Exception ex)
-        {
+     {
             Console.WriteLine($"[Bot Waves] Error in spawn limit check: {ex.Message}");
         }
     }
@@ -557,22 +606,31 @@ public class BotWaves : BasePlugin, IPluginConfig<ConfigGen>
             // Remove player from vote participants if they voted
             g_Main.waveVoteParticipants.Remove(player.SteamID);
 
-            // Check after a short delay if server is now empty or if votes now meet threshold
-            AddTimer(DISCONNECT_CHECK_DELAY, () =>
-            {
+   // Check after a short delay if server is now empty or if votes now meet threshold
+ AddTimer(Config.DisconnectCheckDelay, () =>
+        {
+
                 try
                 {
                     int remainingHumans = GetHumanPlayerCount();
 
-                    if (remainingHumans == 0)
-                    {
-                        if (g_Main.isWaveModeActive)
-                        {
-                            DisableWaveMode();
-                        }
-                        g_Main.waveVoteParticipants.Clear();
-                        return;
-                    }
+   if (remainingHumans == 0)
+             {
+       if (g_Main.isWaveModeActive)
+   {
+       DisableWaveMode();
+    }
+        g_Main.waveVoteParticipants.Clear();
+    
+         // Reset bot quota to default when server becomes empty
+        if (g_Main.isBotsDisabledByCommand)
+           {
+   g_Main.isBotsDisabledByCommand = false;
+         Server.ExecuteCommand($"bot_quota {Config.BotQuotaNormal}");
+       }
+   
+                return;
+        }
 
                     // Edge case: If only 1 player left and they voted to disable, disable wave mode
                     if (remainingHumans == 1 && g_Main.isWaveModeActive && g_Main.waveVoteParticipants.Count == 1)
@@ -603,7 +661,7 @@ public class BotWaves : BasePlugin, IPluginConfig<ConfigGen>
                                 // Vote to enable passed
                                 Server.PrintToChatAll(Localizer["Wave.Vote.PassedEnable"]);
                                 g_Main.waveVoteParticipants.Clear();
-                                EnableWaveMode(1, false, null);
+                                EnableWaveMode(1, false);
                             }
                         }
                     }
@@ -781,15 +839,27 @@ public class BotWaves : BasePlugin, IPluginConfig<ConfigGen>
 
             string message = commandInfo.GetArg(1).Trim().ToLower();
 
-            // Check if message is "wave" or "!wave" (without additional parameters)
-            if (message == "wave" || message == "!wave")
-            {
-                HandleWaveVote(player);
+         Console.WriteLine($"[Bot Waves] OnPlayerSay: Player '{player.PlayerName}' said: '{message}' (Length: {message.Length})");
+
+       // Check if message is "wave" or "!wave" (without additional parameters)
+            // Be more lenient - handle "wave", "!wave", and even just "!" + "wave" with spaces
+   if (message == "wave" || message == "!wave" || message.StartsWith("!wave ") || message.StartsWith("wave "))
+   {
+   Console.WriteLine($"[Bot Waves] OnPlayerSay: Detected wave command, calling HandleWaveVote");
+    HandleWaveVote(player);
+      return HookResult.Handled;
+   }
+    // Check if message is "bot" or "!bot"
+  else if (message == "bot" || message == "!bot" || message.StartsWith("!bot ") || message.StartsWith("bot "))
+          {
+    Console.WriteLine($"[Bot Waves] OnPlayerSay: Detected bot command, calling HandleBotToggle");
+     HandleBotToggle(player);
+  return HookResult.Handled;
             }
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[Bot Waves] Error in OnPlayerSay: {ex.Message}");
+ Console.WriteLine($"[Bot Waves] Error in OnPlayerSay: {ex.Message}");
         }
 
         return HookResult.Continue;
@@ -799,22 +869,28 @@ public class BotWaves : BasePlugin, IPluginConfig<ConfigGen>
     {
         try
         {
-            int humanPlayerCount = GetHumanPlayerCount();
+       Console.WriteLine($"[Bot Waves] HandleWaveVote called by {player.PlayerName}");
+     
+         int humanPlayerCount = GetHumanPlayerCount();
+      
+          Console.WriteLine($"[Bot Waves] Human player count: {humanPlayerCount}, Wave mode active: {g_Main.isWaveModeActive}");
 
-            // Special case: If only 1 player on server, immediately toggle wave mode
-            if (humanPlayerCount == 1)
-            {
-                if (g_Main.isWaveModeActive)
-                {
-                    DisableWaveMode();
-                    player.PrintToChat(Localizer["Wave.TurnedOff"]);
-                }
-                else
-                {
-                    EnableWaveMode(1, false, null);
-                }
-                return;
-            }
+      // Special case: If only 1 player on server, immediately toggle wave mode
+  if (humanPlayerCount == 1)
+     {
+     if (g_Main.isWaveModeActive)
+       {
+      Console.WriteLine($"[Bot Waves] Single player - disabling wave mode");
+          DisableWaveMode();
+          player.PrintToChat(Localizer["Wave.TurnedOff"]);
+    }
+       else
+       {
+    Console.WriteLine($"[Bot Waves] Single player - enabling wave mode");
+         EnableWaveMode(1, false);
+         }
+  return;
+       }
 
             // Add player to vote participants
             g_Main.waveVoteParticipants.Add(player.SteamID);
@@ -840,8 +916,8 @@ public class BotWaves : BasePlugin, IPluginConfig<ConfigGen>
                 {
                     // Enable wave mode
                     Server.PrintToChatAll(Localizer["Wave.Vote.PassedEnable"]);
-                    g_Main.waveVoteParticipants.Clear();
-                    EnableWaveMode(1, false, null);
+             g_Main.waveVoteParticipants.Clear();
+            EnableWaveMode(1, false);
                 }
                 else
                 {
@@ -983,10 +1059,11 @@ public class BotWaves : BasePlugin, IPluginConfig<ConfigGen>
                 foreach (var stat in sortedStats)
                 {
                     var player = Utilities.GetPlayers().FirstOrDefault(p =>
-                          p != null && p.IsValid && !p.IsBot && p.SteamID == stat.SteamId);
+            p != null && p.IsValid && !p.IsBot && p.SteamID == stat.SteamId);
 
-                    if (player != null)
-                    {
+        if (player != null)
+      {
+
                         string localizedMessage = stat.Kills == 1
                        ? Localizer["Wave.Stats.Kills", player.PlayerName, stat.Kills]
                  : Localizer["Wave.Stats.KillsPlural", player.PlayerName, stat.Kills];
@@ -1028,17 +1105,17 @@ public class BotWaves : BasePlugin, IPluginConfig<ConfigGen>
                 {
                     int oldBotCount = g_Main.currentWaveBotCount;
 
-                    // Calculate 10% reduction (minimum 1 bot)
-                    double reductionPercent = oldBotCount * WAVE_REDUCTION_PERCENTAGE;
+                    // Calculate reduction percentage (from config)
+                    double reductionPercent = oldBotCount * (Config.WaveReductionPercentage / 100.0);
                     int botsToRemove = Math.Max(1, (int)Math.Round(reductionPercent));
 
                     // Apply reduction
                     g_Main.currentWaveBotCount -= botsToRemove;
 
-                    // Ensure we never go below 1 bot
-                    if (g_Main.currentWaveBotCount < 1)
+                    // Ensure we never go below minimum bots per wave
+                    if (g_Main.currentWaveBotCount < Config.MinimumBotsPerWave)
                     {
-                        g_Main.currentWaveBotCount = 1;
+                        g_Main.currentWaveBotCount = Config.MinimumBotsPerWave;
                     }
 
                     // Reset failure counter after reduction
@@ -1073,100 +1150,34 @@ public class BotWaves : BasePlugin, IPluginConfig<ConfigGen>
         );
     }
 
+  private int GetActivePlayerCount()
+   {
+      return Utilities.GetPlayers().Count(p =>
+       p != null &&
+      p.IsValid &&
+            !p.IsBot &&
+        !p.IsHLTV &&
+      !IsSpectator(p) &&
+ p.Connected == PlayerConnectedState.PlayerConnected
+        );
+ }
+
     private bool IsSpectator(CCSPlayerController player)
     {
         return player.Team == CsTeam.Spectator;
     }
 
-    // ===== Bot Difficulty Management =====
-
-    private void SetBotDifficulty(int difficulty)
+    // ===== Difficulty Helper =====
+    
+    private string GetDifficultyName()
     {
-        try
+    if (g_Main.isZombieModeActive)
         {
-            // Clamp difficulty to valid range (2-5)
-            difficulty = Math.Clamp(difficulty, 2, 5);
-
-            // Always disable auto-adjust
-            Server.ExecuteCommand("sv_auto_adjust_bot_difficulty false");
-
-            // Set both difficulty cvars to ensure consistency
-            Server.ExecuteCommand($"bot_difficulty {difficulty}");
-            Server.ExecuteCommand($"custom_bot_difficulty {difficulty}");
+       return "Easy (Knives Only)";
         }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"[Bot Waves] Error setting bot difficulty: {ex.Message}");
-        }
-    }
-
-    private void ChangeBotDifficulty(string difficultyName)
-    {
-        try
-        {
-            int difficulty = GetDifficultyValue(difficultyName);
-
-            if (difficulty == -1)
-            {
-                Server.PrintToChatAll(Localizer["Wave.InvalidDifficulty"]);
-                return;
-            }
-
-            g_Main.currentBotDifficulty = difficulty;
-
-            // Set the difficulty cvars
-            SetBotDifficulty(difficulty);
-
-            // Wait a brief moment for cvars to register
-            AddTimer(BOT_DIFFICULTY_CHANGE_DELAY, () =>
-                  {
-                      // Count current bots
-                      int currentBotCount = Utilities.GetPlayers().Count(p =>
-       p != null && p.IsValid && p.IsBot && !p.IsHLTV);
-
-                      // Kick all bots
-                      Server.ExecuteCommand("bot_kick");
-
-                      // Wait another moment, then re-add bots
-                      AddTimer(BOT_DIFFICULTY_CHANGE_DELAY, () =>
-                       {
-                               if (g_Main.isWaveModeActive)
-                               {
-                                   AddBots(g_Main.currentWaveBotCount);
-                               }
-                           });
-                  });
-
-            Server.PrintToChatAll(Localizer["Wave.DifficultyChanged", GetDifficultyName(difficulty)]);
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"[Bot Waves] Error in ChangeBotDifficulty: {ex.Message}");
-        }
-    }
-
-    private int GetDifficultyValue(string difficultyName)
-    {
-        return difficultyName.ToLower() switch
-        {
-            "easy" => 2,
-            "normal" => 3,
-            "hard" => 4,
-            "nightmare" => 5,
-            _ => -1
-        };
-    }
-
-    private string GetDifficultyName(int difficulty)
-    {
-        return difficulty switch
-        {
-            2 => "Easy",
-            3 => "Normal",
-            4 => "Hard",
-            5 => "Nightmare",
-            _ => "Unknown"
-        };
+        
+        // If you want to add more difficulty levels later, add them here
+        return "Normal";
     }
 
     // ===== Round Time Management =====
@@ -1212,22 +1223,37 @@ public class BotWaves : BasePlugin, IPluginConfig<ConfigGen>
     private void ShowHelpMessagesIfNeeded()
     {
         try
-        {
-            // Only show messages if wave mode is NOT active and we have 1-5 players
-            if (g_Main.isWaveModeActive || !Config.ShowHelpMessages)
-                return;
+ {
+     // Only show messages if wave mode is NOT active and we have 1-5 players
+     if (g_Main.isWaveModeActive || !Config.ShowHelpMessages)
+   return;
 
-            int humanCount = GetHumanPlayerCount();
+       int humanCount = GetHumanPlayerCount();
 
-            if (humanCount >= 1 && humanCount <= Config.MaxPlayersWithoutPassword)
-            {
-                Server.PrintToChatAll(Localizer["Wave.HelpMessage"]);
-            }
+          if (humanCount >= 1 && humanCount <= Config.MaxPlayersWithoutPassword)
+   {
+     Server.PrintToChatAll(Localizer["Wave.HelpMessage"]);
+
+    // Show bot toggle help message only if feature is enabled and exactly 1 active player
+            int activePlayers = GetActivePlayerCount();
+          if (Config.EnableBotQuotaToggle && activePlayers == 1)
+    {
+       // Show appropriate bot message based on current state
+       if (g_Main.isBotsDisabledByCommand)
+     {
+      Server.PrintToChatAll(Localizer["Bot.HelpMessage.AddBot"]);
+    }
+        else
+      {
+   Server.PrintToChatAll(Localizer["Bot.HelpMessage.RemoveBot"]);
+  }
+  }
+      }
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[Bot Waves] Error in ShowHelpMessagesIfNeeded: {ex.Message}");
-        }
+Console.WriteLine($"[Bot Waves] Error in ShowHelpMessagesIfNeeded: {ex.Message}");
+     }
     }
 
     [ConsoleCommand("css_waveoff", "Disable Bot Wave mode")]
@@ -1259,17 +1285,81 @@ public class BotWaves : BasePlugin, IPluginConfig<ConfigGen>
 
         try
         {
-            if (!g_Main.isWaveModeActive)
-            {
-                player.PrintToChat(Localizer["Wave.ZombieNeedWaveActive"]);
-                return;
+      if (!g_Main.isWaveModeActive)
+  {
+      player.PrintToChat(Localizer["Wave.ZombieNeedWaveActive"]);
+          return;
             }
 
             ToggleZombieMode();
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[Bot Waves] Error in zombie command: {ex.Message}");
+Console.WriteLine($"[Bot Waves] Error in zombie command: {ex.Message}");
+        }
+    }
+
+  [ConsoleCommand("css_bot", "Toggle bot quota")]
+  [CommandHelper(minArgs: 0, usage: "", whoCanExecute: CommandUsage.CLIENT_ONLY)]
+    public void OnBotCommand(CCSPlayerController? player, CommandInfo commandInfo)
+    {
+        if (player == null || !player.IsValid) return;
+
+        try
+       {
+       HandleBotToggle(player);
+        }
+        catch (Exception ex)
+        {
+      Console.WriteLine($"[Bot Waves] Error in bot command: {ex.Message}");
+ }
+    }
+
+    private void HandleBotToggle(CCSPlayerController player)
+    {
+        try
+        {
+            // Check if feature is enabled in config
+            if (!Config.EnableBotQuotaToggle)
+            {
+   return; // Silently ignore if disabled
+    }
+
+            // Check if wave mode is active
+            if (g_Main.isWaveModeActive)
+         {
+         player.PrintToChat(Localizer["Bot.CannotUseDuringWave"]);
+      return;
+       }
+
+            // Check if exactly 1 active player (non-spectator)
+int activePlayers = GetActivePlayerCount();
+     if (activePlayers != 1)
+         {
+  // Silently ignore if not exactly 1 active player
+                return;
+    }
+
+            // Toggle bot state
+    g_Main.isBotsDisabledByCommand = !g_Main.isBotsDisabledByCommand;
+
+        if (g_Main.isBotsDisabledByCommand)
+   {
+             // Disable bots
+          Server.ExecuteCommand("bot_kick");
+         Server.ExecuteCommand($"bot_quota {Config.BotQuotaDisabled}");
+         Server.PrintToChatAll(Localizer["Bot.Removed"]);
+       }
+       else
+            {
+    // Enable bots
+       Server.ExecuteCommand($"bot_quota {Config.BotQuotaNormal}");
+      Server.PrintToChatAll(Localizer["Bot.Added"]);
+            }
+        }
+        catch (Exception ex)
+        {
+      Console.WriteLine($"[Bot Waves] Error in HandleBotToggle: {ex.Message}");
         }
     }
 }

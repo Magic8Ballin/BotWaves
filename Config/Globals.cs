@@ -16,8 +16,8 @@ public class Globals
     public bool waveModeJustActivated = false; // True when wave mode was just enabled, becomes false after first round starts
     public bool waveStartedWithOverride = false; // Track if password override was used
     
-    // Bot difficulty tracking
-    public int currentBotDifficulty = 3; // Default: Normal (3)
+    // Bot quota toggle (for !bot command)
+  public bool isBotsDisabledByCommand = false; // Track if bots were disabled by !bot command
     
     // Store the player count from round start to use for wave increment calculation
     public int humanPlayerCountAtRoundStart = 0;
