@@ -10,6 +10,11 @@
     <Configuration>Release</Configuration>
     <DebugType>none</DebugType>
   </PropertyGroup>
+  <ItemGroup>
+    <None Remove=" } finally { if %28%24%29 { echo " />
+    <None Remove=" } finally { if %28%24%29 { echo " />
+    <None Remove=" } finally { if %28%24%29 { echo " />
+  </ItemGroup>
 
   <ItemGroup>
     <PackageReference Include="CounterStrikeSharp.API" Version="*" />
