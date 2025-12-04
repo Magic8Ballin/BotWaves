@@ -1,50 +1,41 @@
 {
-  // ===== Wave Mode Settings =====
-  "MaxPlayersWithoutPassword": 5,
-  "AdminPasswordOverride": "glove",
-  "DisableWaveOnFifthPlayer": true,
-  "DisableSkillAutoBalanceInWaveMode": true,
-  "DefaultZombieMode": true,
-
-  // ===== Wave Voting Settings =====
-  "WaveVoteThreshold": 0.5,
+  "ConfigVersion": 1,
   
-  // ===== Round Time Settings =====
-  "EnableDynamicRoundTime": true,
-  "BaseRoundTimeSeconds": 40,
-  "RoundTimeIncrementPerBot": 3,
-  "WaveThresholdForTimeIncrease": 10,
+  "// DEBUG": "===========================================",
+  "DebugMode": true,
   
-  // ===== Bot Spawn Settings =====
-  "SpawnLimitCheckDelay": 1.0,
-  "BotDifficultyChangeDelay": 0.15,
+  "// ACCESS CONTROL": "===========================================",
+  "MaxPlayersAllowed": 5,
+  "AdminPassword": "glove",
+  "DisableOnPlayerLimitExceeded": true,
   
-  // ===== Wave Scaling Settings =====
+  "// VOTING": "===========================================",
+  "VoteThreshold": 0.5,
+  
+  "// WAVE PROGRESSION": "===========================================",
   "MinimumWaveIncrement": 1,
   "MinimumBotsPerWave": 1,
   "MaxFailuresBeforeReduction": 7,
   "WaveReductionPercentage": 10,
   
-  // ===== Respawn System Settings =====
-  "EnableAutoRespawn": true,
-  "ShowRespawnMessages": true,
-  "ShowRespawnEveryXDeaths": 1,
-
-  // ===== Chat Messages Settings =====
+  "// ROUND TIME": "===========================================",
+  "EnableDynamicRoundTime": true,
+  "BaseRoundTimeSeconds": 40,
+  "BotThresholdForExtraTime": 10,
+  "ExtraSecondsPerBot": 3,
+  
+  "// BOT SPAWN": "===========================================",
+  "SpawnCheckDelay": 1.0,
+  
+  "// CHAT MESSAGES": "===========================================",
   "ShowWaveStartMessages": true,
   "ShowWaveEndMessages": true,
   "ShowHelpMessages": true,
-  "HelpMessageInterval": 60,
+  "HelpMessageIntervalSeconds": 60,
   
-  // ===== Bot Quota Toggle Settings =====
-  "EnableBotQuotaToggle": true,
-  "BotQuotaNormal": 2,
-  "BotQuotaDisabled": 0,
+  "// THIRD-PARTY PLUGINS": "===========================================",
+  "DisableSkillAutoBalance": true,
   
-  // ===== Server Protection Settings =====
-  "SaveServerCvars": true,
-  "RestoreCvarsOnDisable": true,
-  
-  // ===== Player Management Settings =====
+  "// TIMING": "===========================================",
   "DisconnectCheckDelay": 0.5
 }

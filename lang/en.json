@@ -1,96 +1,30 @@
 {
-  "// COMMENT_01": "==========================================",
-  "// COMMENT_02": "WAVE START/STOP & SYSTEM MESSAGES",
-  "// COMMENT_03": "==========================================",
-
-  "Wave.TurnedOff": " {gold}!wave{default} Turned off.",
-  "Wave.PleaseUseNumber": " {gold}!wave{default} Please use a number.",
-"Wave.SpecialCodeAccepted": " {gold}!wave{default} Special code accepted!",
-  "Wave.OnlyFourPlayers": " {gold}!wave{default} Only 1-5 players can play.",
-  "Wave.StartingWithOverride": " {gold}!wave{default} Starting at wave {0} with {1} players!",
-  "Wave.StartingAtWave": " {gold}!wave{default} {0} bots ({lime}{1}{default})change bot difficulty? type: {lime}!dif",
-  "Wave.StartingAtWave.Center": "{0} Bots ({1})",
-  "Wave.FifthPlayerJoined": " {gold}!wave{default} A 6th player joined the server. Bot Waves disabled.",
-  "Wave.FifthPlayerJoinedThanks": " {lime}Thanks for helping populate the server! Switched back to regular AWP gameplay.",
-
-  "// COMMENT_04": "==========================================",
-  "// COMMENT_05": "VOTING SYSTEM",
-  "// COMMENT_06": "==========================================",
-
-  "Wave.Vote.Enable": " {lime}{0}{default} wants Bot Waves enabled. ({1} of {2} votes needed)",
-  "Wave.Vote.Disable": " {lime}{0}{default} wants Bot Waves disabled. ({1} of {2} votes needed)",
-  "Wave.Vote.PassedEnable": " {gold}!wave{default} Vote passed! Bot Waves starting...",
-  "Wave.Vote.PassedDisable": " {gold}!wave{default} Vote passed! Bot Waves stopping...",
-  "Wave.Vote.UseWaveToStop": " {gold}!wave{default} To stop wave mode, type {lime}!wave{default} or {lime}wave{default} in chat to cast your vote. ({0} of {1} votes needed)",
-
-  "// COMMENT_07": "==========================================",
-  "// COMMENT_08": "HELP MESSAGES",
-  "// COMMENT_09": "==========================================",
-
-  "Wave.HelpMessage": " {default}Bot waves?{lime}!wave",
-  "Wave.Help.Vote": " Vote: {lime}!wave{default} (start/stop)",
-  "Wave.Help.Config": " Config: {lime}!wave 10{default} (change wave), {lime}!wave easy/normal/hard{default} (difficulty)",
-  "Wave.Help.Modes": " Modes: {lime}!dif{default} (cycle difficulty: Easy -> Normal -> Hard)",
+  "Wave.Help": " {gold}Bot Waves{default} - Type {lime}!wave{default} to start, {lime}!dif{default} to change difficulty",
   
-  "// COMMENT_10": "==========================================",
-  "// COMMENT_11": "DIFFICULTY & ZOMBIE MODE",
-  "// COMMENT_12": "==========================================",
-
-  "Wave.ZombieEnabled": " {gold}!wave{default} {green}EASY MODE!{default} Bots now only have knives!",
-  "Wave.ZombieEnabled.Center": "EASY MODE - BOTS HAVE KNIVES ONLY",
-  "Wave.ZombieDisabled": " {gold}!wave{default} Easy mode disabled. Bots have normal weapons.",
-  "Wave.ZombieDisabled.Center": "EASY MODE DISABLED - BOTS HAVE GUNS",
-  "Wave.ZombieNeedWaveActive": " {gold}!wave{default} Wave mode must be active to change difficulty. Use {lime}!wave{default} first!",
-
-  "Wave.DifficultyChanged": " {gold}!wave{default} Bot difficulty changed to {lime}{0}{default}!",
-  "Wave.DifficultyChanged.Center": "DIFFICULTY CHANGED TO {0}",
-  "Wave.DifficultySet": " {gold}!wave{default} Bot difficulty: {lime}{0}{default}",
-  "Wave.InvalidDifficulty": " {gold}!wave{default} Invalid difficulty. Use: easy, normal, or hard",
-
-  "Wave.CurrentDifficulty": " Difficulty: {lime}{0}{default}",
-
-  "Wave.Dif.NeedWaveActive": " {gold}!dif{default} Wave mode must be active first! Type {lime}!wave{default} to start.",
-  "Wave.Dif.CycledTo": " {gold}!dif{default} Difficulty cycled to: {lime}{0}{default}!",
-  "Wave.Dif.CycledTo.Center": "DIFFICULTY: {0}",
-
-  "// COMMENT_13": "==========================================",
-  "// COMMENT_14": "WAVE WIN/LOSS",
-  "// COMMENT_15": "==========================================",
-
-  "Wave.YouWonNext": " {gold}!wave {green}Wave Defeated!{default} Adding {green}+{0}{default} bots!",
-  "Wave.YouWonNext.Center": "WAVE COMPLETE! +{0} BOTS NEXT WAVE",
-  "Wave.YouLostTryAgain": " {gold}!wave{default} You lost. Try wave {0} again!",
-  "Wave.YouLostTryAgain.Center": "WAVE FAILED - TRY {0} BOTS AGAIN",
-
-  "Wave.FailureCounter": " {red}Wave Failed {0}/{1}",
-  "Wave.DifficultyReduced": " {gold}!wave{default} Difficulty reduced! Wave {0} reduced from {1} to {2} bots ({3} removed)",
-  "Wave.DifficultyReduced.Center": "DIFFICULTY REDUCED: {0} BOTS (WAS {1})",
-
-  "// COMMENT_16": "==========================================",
-  "// COMMENT_17": "WAVE COMBAT & RESPAWNS",
-  "// COMMENT_18": "==========================================",
-
-  "Wave.FightBots": " {gold}!wave{default} {0} bots ({lime}{1}{default})change bot difficulty? type: {lime}!dif",
-  "Wave.FightBots.Center": "FIGHT {0} BOTS - {1} DIFFICULTY",
-  "Wave.SpawnLimitReached": " {gold}!wave{default} Only {0} bots fit on map. {1} will re-spawn!",
-  "Wave.NoMoreRespawns": " {gold}!wave{default} No more bot re-spawns! Kill the rest!",
-  "Wave.NoMoreRespawns.Center": "NO MORE BOT RESPAWNS - KILL THEM ALL!",
-  "Wave.RespawnsLeft": " {default}Bot re-spawns: {0}",
-
-  "// COMMENT_19": "==========================================",
-  "// COMMENT_20": "STATISTICS",
-  "// COMMENT_21": "==========================================",
-
-  "Wave.Stats.Kills": " {lime}{0}{default} - {1} kill",
-  "Wave.Stats.KillsPlural": " {lime}{0}{default} - {1} kills",
-
-  "// COMMENT_22": "==========================================",
-  "// COMMENT_23": "BOT QUOTA TOGGLE",
-  "// COMMENT_24": "==========================================",
-
-  "Bot.Removed": " {gold}!bot{default} All bots removed. Want a bot? Type {lime}!bot{default}",
-  "Bot.Added": " {gold}!bot{default} Bot quota set to 2. Remove bot? Type {lime}!bot{default}",
-  "Bot.CannotUseDuringWave": " {gold}!bot{default} Can't toggle bots during wave mode!",
-  "Bot.HelpMessage.RemoveBot": " Remove bot? Type {lime}!bot{default}",
-  "Bot.HelpMessage.AddBot": " Want a bot? Type {lime}!bot{default}"
+  "Wave.InvalidNumber": " {red}Invalid number.{default} Usage: !wave [number]",
+  "Wave.NeedWaveActive": " {red}Wave mode must be active first!{default} Type {lime}!wave{default} to start.",
+  "Wave.TooManyPlayers": " {red}Too many players ({0} max).{default} Wave mode disabled for large groups.",
+  "Wave.AlreadyVoted": " {yellow}You already voted!{default}",
+  
+  "Wave.VoteCast": " {lime}{0}{default} voted to {1} wave mode ({2}/{3})",
+  "Wave.VotePassedEnable": " {green}Vote passed!{default} Wave mode {lime}ENABLED{default}!",
+  "Wave.VotePassedDisable": " {green}Vote passed!{default} Wave mode {red}DISABLED{default}.",
+  
+  "Wave.Enabled": " {gold}Wave Mode{default} {green}ENABLED{default} - Starting with {lime}{0}{default} bot(s)!",
+  "Wave.Disabled": " {gold}Wave Mode{default} {red}DISABLED{default}.",
+  "Wave.AdminStart": " {gold}Wave Mode{default} {green}ENABLED{default} by admin - Starting with {lime}{0}{default} bots!",
+  "Wave.BotCountChanged": " {gold}Wave Mode{default} - Bot count changed to {lime}{0}{default}. Round restarting...",
+  
+  "Wave.PlayerLimitExceeded": " {red}Player limit exceeded!{default} Wave mode has been disabled.",
+  
+  "Wave.DifficultyEasy": " {gold}Difficulty:{default} {green}EASY{default} - Bots have knives only!",
+  "Wave.DifficultyHard": " {gold}Difficulty:{default} {red}HARD{default} - Bots have all weapons!",
+  
+  "Wave.RoundStart": " {gold}Wave:{default} Fight {lime}{0}{default} bots! Difficulty: {yellow}{1}{default}",
+  "Wave.BotsCapped": " {yellow}Server limit:{default} Only {0} of {1} bots could spawn.",
+  "Wave.LimitedSpawns": " {yellow}Limited spawns:{default} {0} bots alive, {lime}{2} total kills{default} needed to win!",
+  
+  "Wave.Victory": " {green}VICTORY!{default} Adding {lime}+{0}{default} bots next wave!",
+  "Wave.Defeat": " {red}DEFEAT!{default} Failures: {yellow}{0}/{1}{default}",
+  "Wave.Reduced": " {yellow}Difficulty reduced:{default} {0} ? {lime}{1}{default} bots"
 }

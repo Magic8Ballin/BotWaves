@@ -1,1365 +1,1263 @@
 using CounterStrikeSharp.API;
 using CounterStrikeSharp.API.Core;
 using CounterStrikeSharp.API.Core.Attributes;
-using CounterStrikeSharp.API.Modules.Commands;
-using CounterStrikeSharp.API.Modules.Utils;
 using CounterStrikeSharp.API.Core.Attributes.Registration;
+using CounterStrikeSharp.API.Modules.Commands;
 using CounterStrikeSharp.API.Modules.Timers;
+using CounterStrikeSharp.API.Modules.Utils;
 
 namespace BotWaves;
 
+/// <summary>
+/// Bot Waves - Cooperative survival mode where players fight waves of bots.
+/// Humans play as Terrorists, Bots play as Counter-Terrorists.
+/// </summary>
 [MinimumApiVersion(80)]
-public class BotWaves : BasePlugin, IPluginConfig<ConfigGen>
+public sealed class BotWaves : BasePlugin, IPluginConfig<ConfigGen>
 {
+    // ============================================================
+    // PLUGIN METADATA
+    // ============================================================
+    
     public override string ModuleName => "Bot Waves";
-    public override string ModuleVersion => "2.5.0";
+    public override string ModuleVersion => "4.0.0";
     public override string ModuleAuthor => "Gold KingZ & Magic8Ball";
-    public override string ModuleDescription => "Bot Wave survival mode for 1-5 players";
+    public override string ModuleDescription => "Cooperative survival mode - fight waves of bots!";
 
-    public static BotWaves? Instance { get; private set; }
-    public Globals g_Main = new();
+    // ============================================================
+    // CONSTANTS
+    // ============================================================
+    
+    private static class Difficulty
+    {
+        public const int Easy = 1;   // Bots don't shoot, knife-only
+        public const int Hard = 5;   // Expert bots with all weapons
+    }
+
+    // ============================================================
+    // STATE
+    // ============================================================
+    
+    /// <summary>Plugin configuration loaded from JSON.</summary>
     public ConfigGen Config { get; set; } = new();
+    
+    /// <summary>Runtime state for wave mode.</summary>
+    private readonly WaveState _state = new();
 
+    // ============================================================
+    // DEBUG LOGGING
+    // All debug output goes through these methods for consistency.
+    // Set Config.DebugMode = true to enable verbose logging.
+    // ============================================================
+    
+    /// <summary>
+    /// Logs a message to console. Always prints regardless of debug mode.
+    /// Use for important events like plugin load/unload.
+    /// </summary>
+    private void Log(string message)
+    {
+        Console.WriteLine($"[BotWaves] {message}");
+    }
+    
+    /// <summary>
+    /// Logs a debug message to console if DebugMode is enabled.
+    /// Use for detailed diagnostic information.
+    /// </summary>
+    private void Debug(string message)
+    {
+        if (Config.DebugMode)
+        {
+            Console.WriteLine($"[BotWaves DEBUG] {message}");
+        }
+    }
+    
+    /// <summary>
+    /// Logs a categorized debug message. Categories help filter logs.
+    /// Categories: LOAD, MAP, CMD, VOTE, WAVE, ROUND, SPAWN, TEAM, EVENT, CVAR
+    /// </summary>
+    private void Debug(string category, string message)
+    {
+        if (Config.DebugMode)
+        {
+            Console.WriteLine($"[BotWaves DEBUG] [{category}] {message}");
+        }
+    }
+    
+    /// <summary>
+    /// Logs current state snapshot for debugging.
+    /// </summary>
+    private void DebugState()
+    {
+        if (Config.DebugMode)
+        {
+            Console.WriteLine($"[BotWaves DEBUG] [STATE] {_state.ToDebugString()}");
+        }
+    }
+
+    // ============================================================
+    // PLUGIN LIFECYCLE
+    // ============================================================
+    
+    /// <summary>
+    /// Called when config is loaded from JSON file.
+    /// </summary>
     public void OnConfigParsed(ConfigGen config)
     {
         Config = config;
-
-        // Validate WaveVoteThreshold (0.0 - 1.0)
-        if (Config.WaveVoteThreshold < 0.0f || Config.WaveVoteThreshold > 1.0f)
+        
+        // Validate config values
+        Config.VoteThreshold = Math.Clamp(Config.VoteThreshold, 0.1f, 1.0f);
+        Config.MaxPlayersAllowed = Math.Max(1, Config.MaxPlayersAllowed);
+        Config.MinimumWaveIncrement = Math.Max(1, Config.MinimumWaveIncrement);
+        Config.MinimumBotsPerWave = Math.Max(1, Config.MinimumBotsPerWave);
+        Config.MaxFailuresBeforeReduction = Math.Max(1, Config.MaxFailuresBeforeReduction);
+        Config.WaveReductionPercentage = Math.Clamp(Config.WaveReductionPercentage, 1, 100);
+        Config.BaseRoundTimeSeconds = Math.Max(30, Config.BaseRoundTimeSeconds);
+        Config.HelpMessageIntervalSeconds = Math.Max(10, Config.HelpMessageIntervalSeconds);
+        
+        if (Config.DebugMode)
         {
-            Console.WriteLine($"[Bot Waves] Warning: WaveVoteThreshold ({Config.WaveVoteThreshold}) is invalid. Clamping to range [0.0-1.0].");
-            Config.WaveVoteThreshold = Math.Clamp(Config.WaveVoteThreshold, 0.0f, 1.0f);
-        }
-
-        // Validate MaxPlayersWithoutPassword (>= 1)
-        if (Config.MaxPlayersWithoutPassword < 1)
-        {
-            Console.WriteLine($"[Bot Waves] Warning: MaxPlayersWithoutPassword ({Config.MaxPlayersWithoutPassword}) is invalid. Setting to minimum value of 1.");
-            Config.MaxPlayersWithoutPassword = 1;
-        }
-
-        // Validate MinimumWaveIncrement (>= 1)
-        if (Config.MinimumWaveIncrement < 1)
-        {
-            Console.WriteLine($"[Bot Waves] Warning: MinimumWaveIncrement ({Config.MinimumWaveIncrement}) is invalid. Setting to minimum value of 1.");
-            Config.MinimumWaveIncrement = 1;
-        }
-
-        // Validate MinimumBotsPerWave (>= 1)
-        if (Config.MinimumBotsPerWave < 1)
-        {
-            Console.WriteLine($"[Bot Waves] Warning: MinimumBotsPerWave ({Config.MinimumBotsPerWave}) is invalid. Setting to minimum value of 1.");
-            Config.MinimumBotsPerWave = 1;
-        }
-
-        // Validate MaxFailuresBeforeReduction (>= 1)
-        if (Config.MaxFailuresBeforeReduction < 1)
-        {
-            Console.WriteLine($"[Bot Waves] Warning: MaxFailuresBeforeReduction ({Config.MaxFailuresBeforeReduction}) is invalid. Setting to minimum value of 1.");
-            Config.MaxFailuresBeforeReduction = 1;
-        }
-
-        // Validate WaveReductionPercentage (1-100)
-        if (Config.WaveReductionPercentage < 1 || Config.WaveReductionPercentage > 100)
-        {
-            Console.WriteLine($"[Bot Waves] Warning: WaveReductionPercentage ({Config.WaveReductionPercentage}) is invalid. Clamping to range [1-100].");
-            Config.WaveReductionPercentage = Math.Clamp(Config.WaveReductionPercentage, 1, 100);
-        }
-
-        // Validate BaseRoundTimeSeconds (> 0)
-        if (Config.BaseRoundTimeSeconds <= 0)
-        {
-            Console.WriteLine($"[Bot Waves] Warning: BaseRoundTimeSeconds ({Config.BaseRoundTimeSeconds}) is invalid. Setting to default value of 40.");
-            Config.BaseRoundTimeSeconds = 40;
-        }
-
-        // Validate HelpMessageInterval (> 0)
-        if (Config.HelpMessageInterval <= 0)
-        {
-            Console.WriteLine($"[Bot Waves] Warning: HelpMessageInterval ({Config.HelpMessageInterval}) is invalid. Setting to default value of 60.");
-            Config.HelpMessageInterval = 60;
-        }
-
-        // Validate ShowRespawnEveryXDeaths (>= 1)
-        if (Config.ShowRespawnEveryXDeaths < 1)
-        {
-            Console.WriteLine($"[Bot Waves] Warning: ShowRespawnEveryXDeaths ({Config.ShowRespawnEveryXDeaths}) is invalid. Setting to minimum value of 1.");
-            Config.ShowRespawnEveryXDeaths = 1;
-        }
-
-        // Validate BotQuotaNormal (>= 0)
-        if (Config.BotQuotaNormal < 0)
-        {
-            Console.WriteLine($"[Bot Waves] Warning: BotQuotaNormal ({Config.BotQuotaNormal}) is invalid. Setting to default value of 2.");
-            Config.BotQuotaNormal = 2;
-        }
-
-        // Validate BotQuotaDisabled (>= 0)
-        if (Config.BotQuotaDisabled < 0)
-        {
-            Console.WriteLine($"[Bot Waves] Warning: BotQuotaDisabled ({Config.BotQuotaDisabled}) is invalid. Setting to minimum value of 0.");
-            Config.BotQuotaDisabled = 0;
+            Log("Config loaded with DebugMode ENABLED");
+            Debug("CONFIG", $"MaxPlayersAllowed={Config.MaxPlayersAllowed}");
+            Debug("CONFIG", $"VoteThreshold={Config.VoteThreshold}");
+            Debug("CONFIG", $"AdminPassword={(string.IsNullOrEmpty(Config.AdminPassword) ? "(not set)" : "(set)")}");
         }
     }
-
+    
+    /// <summary>
+    /// Called when plugin loads.
+    /// </summary>
     public override void Load(bool hotReload)
     {
-        try
-        {
-            Instance = this;
-
-            Console.WriteLine($"===========================================");
-            Console.WriteLine($"[Bot Waves] VERSION 2.5.0-DEBUG-FIX3 LOADING");
-            Console.WriteLine($"[Bot Waves] If you see this, the new code IS running!");
-            Console.WriteLine($"===========================================");
-
-            // Register listeners for map events
-            RegisterListener<Listeners.OnMapStart>(OnMapStart);
-            RegisterListener<Listeners.OnMapEnd>(OnMapEnd);
-
-            // Register event handlers
-            RegisterEventHandler<EventPlayerConnectFull>(OnPlayerConnectFull);
-            RegisterEventHandler<EventPlayerDisconnect>(OnPlayerDisconnect);
-            RegisterEventHandler<EventRoundStart>(OnRoundStart);
-            RegisterEventHandler<EventRoundEnd>(OnRoundEnd);
-            RegisterEventHandler<EventPlayerTeam>(OnPlayerTeam);
-            RegisterEventHandler<EventPlayerSpawn>(OnPlayerSpawn);
-            RegisterEventHandler<EventPlayerDeath>(OnPlayerDeath);
-
-            // Add chat listeners for detecting "wave" messages (both public and team chat)
-            AddCommandListener("say", OnPlayerSay);
-            AddCommandListener("say_team", OnPlayerSay);
-
-            // Start help message timer using config interval
-            if (Config.ShowHelpMessages)
-            {
-                g_Main._helpMessageTimer = AddTimer(Config.HelpMessageInterval, ShowHelpMessagesIfNeeded, TimerFlags.REPEAT);
-            }
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"[Bot Waves] ERROR during load: {ex.Message}");
-            throw;
-        }
+        Log($"Loading v{ModuleVersion}...");
+        Debug("LOAD", $"HotReload={hotReload}");
+        
+        // Register map events
+        RegisterListener<Listeners.OnMapStart>(OnMapStart);
+        RegisterListener<Listeners.OnMapEnd>(OnMapEnd);
+        
+        // Register game events
+        RegisterEventHandler<EventPlayerConnectFull>(OnPlayerConnectFull);
+        RegisterEventHandler<EventPlayerDisconnect>(OnPlayerDisconnect);
+        RegisterEventHandler<EventPlayerTeam>(OnPlayerTeam);
+        RegisterEventHandler<EventRoundStart>(OnRoundStart);
+        RegisterEventHandler<EventRoundEnd>(OnRoundEnd);
+        RegisterEventHandler<EventPlayerDeath>(OnPlayerDeath);
+        RegisterEventHandler<EventPlayerSpawn>(OnPlayerSpawn);
+        
+        // Register chat commands
+        AddCommandListener("say", OnPlayerChat);
+        AddCommandListener("say_team", OnPlayerChat);
+        
+        // Start help message timer
+        StartHelpTimer();
+        
+        Log("Loaded successfully!");
+        DebugState();
     }
-
+    
+    /// <summary>
+    /// Called when plugin unloads.
+    /// </summary>
     public override void Unload(bool hotReload)
     {
-        // Kill help message timer
-        g_Main._helpMessageTimer?.Kill();
-        g_Main._helpMessageTimer = null;
-
-        if (g_Main.isWaveModeActive)
+        Debug("LOAD", $"Unloading, HotReload={hotReload}");
+        
+        // Clean up timers
+        _state.KillAllTimers();
+        
+        // Disable wave mode if active
+        if (_state.IsActive)
         {
             DisableWaveMode();
         }
-        Instance = null;
+        
+        Log("Unloaded");
     }
-
+    
+    /// <summary>
+    /// Called when a new map starts.
+    /// </summary>
     private void OnMapStart(string mapName)
     {
-        // Reset wave mode on map change and ensure all cvars are cleaned up
-        if (g_Main.isWaveModeActive)
+        Debug("MAP", $"Map starting: {mapName}");
+        
+        // Reset wave mode on map change
+        if (_state.IsActive)
         {
-            DisableWaveMode();
+            Debug("MAP", "Wave mode was active, resetting");
+            _state.Reset();
         }
+        
+        // Restart help timer
+        StartHelpTimer();
+        
+        DebugState();
     }
-
+    
+    /// <summary>
+    /// Called when map ends.
+    /// </summary>
     private void OnMapEnd()
     {
-        // Clean up wave mode and ensure all cvars are cleaned up
-        if (g_Main.isWaveModeActive)
-        {
-            DisableWaveMode();
-        }
-    }
-
-    [ConsoleCommand("css_wave", "Enable/disable Bot Wave mode")]
-    [CommandHelper(minArgs: 0, usage: "[number|off|disable|help] [password]", whoCanExecute: CommandUsage.CLIENT_ONLY)]
-    public void OnWaveCommand(CCSPlayerController? player, CommandInfo commandInfo)
-    {
-        Console.WriteLine($"[Bot Waves] OnWaveCommand ENTRY - Player: {player?.PlayerName ?? "NULL"}");
+        Debug("MAP", "Map ending");
         
-        if (player == null || !player.IsValid)
-        {
-            Console.WriteLine($"[Bot Waves] OnWaveCommand - Player is null or invalid, returning");
-            return;
-        }
-
-        try
-        {
-            string arg = commandInfo.ArgCount > 1 ? commandInfo.GetArg(1).ToLower() : "";
-
-            Console.WriteLine($"[Bot Waves] OnWaveCommand called by {player.PlayerName}, ArgCount: {commandInfo.ArgCount}, Arg: '{arg}'");
-
-            // If no arguments provided, trigger wave vote (same as typing "wave" in chat)
-            if (string.IsNullOrEmpty(arg))
-            {
-                Console.WriteLine($"[Bot Waves] No arguments provided, calling HandleWaveVote");
-                HandleWaveVote(player);
-                Console.WriteLine($"[Bot Waves] HandleWaveVote completed, returning");
-                return;
-            }
-
-            // Handle help command
-            if (arg == "help" || arg == "h")
-            {
-                player.PrintToChat(Localizer["Wave.Help.Vote"]);
-                player.PrintToChat(Localizer["Wave.Help.Config"]);
-                return;
-            }
-
-            // Handle stop/disable commands - show educational message
-            if (arg == "off" || arg == "disable" || arg == "0" || arg == "stop")
-            {
-                int humanPlayerCount = GetHumanPlayerCount();
-                int votesNeeded = Math.Max(2, (int)Math.Ceiling(humanPlayerCount * Config.WaveVoteThreshold));
-                int currentVotes = g_Main.waveVoteParticipants.Count;
-
-                player.PrintToChat(Localizer["Wave.Vote.UseWaveToStop", currentVotes, votesNeeded]);
-                return;
-            }
-
-            // Handle wave number changes (requires wave mode active or password override)
-            if (!int.TryParse(arg, out int waveNumber) || waveNumber <= 0)
-            {
-                player.PrintToChat(Localizer["Wave.PleaseUseNumber"]);
-                return;
-            }
-
-            int humanPlayerCount2 = GetHumanPlayerCount();
-
-            // Check for password in second argument
-            bool hasOverride = false;
-
-            if (commandInfo.ArgCount > 2)
-            {
-                string secondArg = commandInfo.GetArg(2).ToLower();
-
-                // Check if it's a password
-                if (secondArg == Config.AdminPasswordOverride)
-                {
-                    hasOverride = true;
-                    player.PrintToChat(Localizer["Wave.SpecialCodeAccepted"]);
-                }
-            }
-
-            // If wave mode is already active, just change the wave number
-            if (g_Main.isWaveModeActive)
-            {
-                g_Main.currentWaveBotCount = waveNumber;
-                g_Main.consecutiveWaveFailures = 0;
-
-                Server.ExecuteCommand("mp_restartgame 1");
-                string difficulty = GetDifficultyName();
-                Server.PrintToChatAll(Localizer["Wave.StartingAtWave", waveNumber, difficulty]);
-
-                return;
-            }
-
-            // Wave mode not active - check if we can start it with password override
-            if (humanPlayerCount2 > Config.MaxPlayersWithoutPassword && !hasOverride)
-            {
-                player.PrintToChat(Localizer["Wave.OnlyFourPlayers"]);
-                return;
-            }
-
-            // Start wave mode with password override (bypass voting)
-            EnableWaveMode(waveNumber, hasOverride);
-
-            // Show appropriate message based on override usage
-            if (hasOverride && humanPlayerCount2 > Config.MaxPlayersWithoutPassword)
-            {
-                Server.PrintToChatAll(Localizer["Wave.StartingWithOverride", waveNumber, humanPlayerCount2]);
-            }
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"[Bot Waves] Error in wave command: {ex.Message}");
-        }
-    }
-
-    private void EnableWaveMode(int startWave, bool usedOverride = false)
-    {
-        Console.WriteLine($"[Bot Waves] EnableWaveMode CALLED - StartWave: {startWave}, UsedOverride: {usedOverride}");
+        _state.KillAllTimers();
         
-     g_Main.isWaveModeActive = true;
-        g_Main.currentWaveBotCount = startWave;
-        g_Main.waveModeJustActivated = true;
-   g_Main.waveStartedWithOverride = usedOverride;
-        g_Main.consecutiveWaveFailures = 0;
-     g_Main.playersAssignedToTeam.Clear();
-   g_Main.waveVoteParticipants.Clear(); // Clear votes when wave mode starts
-
-   Console.WriteLine($"[Bot Waves] Wave mode state set, DefaultZombieMode: {Config.DefaultZombieMode}");
-
-        // Set bot mode based on DefaultZombieMode config
-        if (Config.DefaultZombieMode)
+        if (_state.IsActive)
         {
-         g_Main.isZombieModeActive = true;
-       Server.ExecuteCommand("bot_difficulty 1");
- Server.ExecuteCommand("bot_knives_only 1");
-     }
-        else
-  {
-      g_Main.isZombieModeActive = false;
-    Server.ExecuteCommand("bot_difficulty 5");
-  Server.ExecuteCommand("bot_knives_only 0");
-  Server.ExecuteCommand("bot_all_weapons 1");
-        }
-
-        // Disable auto-adjust bot difficulty
-        Server.ExecuteCommand("sv_auto_adjust_bot_difficulty false");
-
-        // Reset respawn system to prevent leftover state
-        g_Main.autoRespawnEnabled = false;
-        g_Main.respawnsNeeded = 0;
-        g_Main.respawnsUsed = 0;
-        Server.ExecuteCommand("mp_respawn_on_death_ct 0");
-
-        // Save current server cvar values
-        SaveServerCvar("mp_autoteambalance");
-        SaveServerCvar("mp_limitteams");
-        SaveServerCvar("mp_teambalance_enabled");
-        SaveServerCvar("mp_force_pick_time");
-        SaveServerCvar("mp_roundtime");
-        SaveServerCvar("mp_warmuptime");
-        SaveServerCvar("mp_do_warmup_period");
-        SaveServerCvar("mp_forcecamera");
-        SaveServerCvar("bot_knives_only");
-        SaveServerCvar("bot_all_weapons");
-        SaveServerCvar("bot_difficulty");
-        SaveServerCvar("custom_bot_difficulty");
-        SaveServerCvar("sv_auto_adjust_bot_difficulty");
-
-        // Save and disable Skill Auto Balance plugin (if enabled in config)
-        if (Config.DisableSkillAutoBalanceInWaveMode)
-        {
-            SaveServerCvar("css_skill_autobalance_minplayers");
-            Server.ExecuteCommand("css_skill_autobalance_minplayers 30");
-        }
-
-        // Disable all auto-balancing mechanisms
-        Server.ExecuteCommand("mp_autoteambalance 0");
-        Server.ExecuteCommand("mp_limitteams 0");
-        Server.ExecuteCommand("mp_teambalance_enabled 0");
-        Server.ExecuteCommand("mp_force_pick_time 0");
-
-        // Disable warmup to prevent round restarts on player joins
-        Server.ExecuteCommand("mp_warmuptime 0");
-        Server.ExecuteCommand("mp_do_warmup_period 0");
-
-        // Force spectators to only watch their own team (Terrorists)
-        Server.ExecuteCommand("mp_forcecamera 1");
-
-        // Kick all existing bots
-        Server.ExecuteCommand("bot_kick");
-
-        // Restart game to immediately start wave mode
-        Server.ExecuteCommand("mp_restartgame 1");
-
-    string difficulty = GetDifficultyName();
-        Server.PrintToChatAll(Localizer["Wave.StartingAtWave", startWave, difficulty]);
-    }
-
-    private void ToggleZombieMode()
-    {
-        g_Main.isZombieModeActive = !g_Main.isZombieModeActive;
-
-        if (g_Main.isZombieModeActive)
-        {
-            // Enable zombie mode - bots only have knives + difficulty 1
-            Server.ExecuteCommand("bot_difficulty 1");
-            Server.ExecuteCommand("bot_knives_only 1");
-            Server.PrintToChatAll(Localizer["Wave.ZombieEnabled"]);
-        }
-        else
-        {
-            // Disable zombie mode - bots have normal weapons + difficulty 5 (hard)
-            Server.ExecuteCommand("bot_difficulty 5");
-            Server.ExecuteCommand("bot_knives_only 0");
-            Server.ExecuteCommand("bot_all_weapons 1");
-            Server.PrintToChatAll(Localizer["Wave.ZombieDisabled"]);
-        }
-
-        // Restart round to apply changes immediately
-        Server.ExecuteCommand("mp_restartgame 1");
-    }
-
-    private void DisableWaveMode()
-    {
-        g_Main.isWaveModeActive = false;
-        g_Main.isZombieModeActive = false;
-        g_Main.currentWaveBotCount = 1;
-        g_Main.autoRespawnEnabled = false;
-        g_Main.respawnsNeeded = 0;
-        g_Main.respawnsUsed = 0;
-        g_Main.waveModeJustActivated = false;
-        g_Main.waveStartedWithOverride = false;
-        g_Main.consecutiveWaveFailures = 0;
-        g_Main.playersAssignedToTeam.Clear();
-        g_Main.waveVoteParticipants.Clear(); // Clear votes when wave mode stops
-
-        // Kill any active timers
-        g_Main._botSpawnTimer?.Kill();
-        g_Main._botSpawnTimer = null;
-
-        // Disable auto-respawn if it was on
-        Server.ExecuteCommand("mp_respawn_on_death_ct 0");
-        Server.ExecuteCommand("mp_respawn_on_death_t 0");
-
-        // Kick all bots
-        Server.ExecuteCommand("bot_kick");
-
-        // Restore all saved cvar values
-        RestoreAllCvars();
-    }
-
-    private void SaveServerCvar(string cvarName)
-    {
-        if (!Config.SaveServerCvars)
-        {
-            return;
-        }
-
-        try
-        {
-            // NOTE: CounterStrikeSharp doesn't provide a way to read current cvar values.
-            // These are CS2's default values. If your server uses custom defaults, 
-            // you may want to disable SaveServerCvars and RestoreCvarsOnDisable in config.
-            string defaultValue = cvarName switch
-            {
-                "mp_autoteambalance" => "1",
-                "mp_limitteams" => "2",
-                "mp_teambalance_enabled" => "1",
-                "mp_force_pick_time" => "15",
-                "mp_roundtime" => "1.92",
-                "mp_warmuptime" => "60",
-                "mp_do_warmup_period" => "1",
-                "mp_forcecamera" => "0",
-                "bot_knives_only" => "0",
-                "bot_all_weapons" => "1",
-                "bot_difficulty" => "2",
-                "custom_bot_difficulty" => "2",
-                "sv_auto_adjust_bot_difficulty" => "true",
-                "css_skill_autobalance_minplayers" => "5",
-                _ => "1"
-            };
-
-            g_Main.savedCvars[cvarName] = defaultValue;
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"[Bot Waves] Error saving cvar {cvarName}: {ex.Message}");
+            _state.Reset();
         }
     }
 
-    private void RestoreAllCvars()
-    {
-        if (!Config.RestoreCvarsOnDisable)
-        {
-            return;
-        }
-
-        foreach (var kvp in g_Main.savedCvars)
-        {
-            try
-            {
-                Server.ExecuteCommand($"{kvp.Key} {kvp.Value}");
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"[Bot Waves] Error restoring {kvp.Key}: {ex.Message}");
-            }
-        }
-
-        g_Main.savedCvars.Clear();
-    }
-
-    private void CheckSpawnLimit(int waveTarget)
-    {
-        try
-        {
-  var aliveCTBots = Utilities.GetPlayers().Count(p => p != null && p.IsValid && p.IsBot && !p.IsHLTV && p.Team == g_Main.botTeam);
-
-          string difficulty = GetDifficultyName();
-
- if (aliveCTBots < waveTarget)
- {
-     // Hit spawn limit! Enable auto-respawn
-     if (Config.EnableAutoRespawn)
-              {
-      g_Main.respawnsNeeded = waveTarget - aliveCTBots;
-          g_Main.respawnsUsed = 0;
-          g_Main.autoRespawnEnabled = true;
-
-     Server.ExecuteCommand("mp_respawn_on_death_ct 1");
-
-         if (Config.ShowWaveStartMessages)
-           {
-    Server.PrintToChatAll(Localizer["Wave.FightBots", waveTarget, difficulty]);
-          Server.PrintToChatAll(Localizer["Wave.SpawnLimitReached", aliveCTBots, g_Main.respawnsNeeded]);
-              }
-                }
-         else
-           {
-            if (Config.ShowWaveStartMessages)
-             {
-  Server.PrintToChatAll(Localizer["Wave.FightBots", aliveCTBots, difficulty]);
-         }
-     }
-    }
-       else
-            {
-    // Normal wave, all bots spawned
-                if (Config.ShowWaveStartMessages)
-                {
- Server.PrintToChatAll(Localizer["Wave.FightBots", waveTarget, difficulty]);
-            }
-            }
-
-            // Clear the just activated flag - bots are confirmed spawned and wave is truly running
-          if (g_Main.waveModeJustActivated)
-{
-   g_Main.waveModeJustActivated = false;
-            }
-        }
-        catch (Exception ex)
-     {
-            Console.WriteLine($"[Bot Waves] Error in spawn limit check: {ex.Message}");
-        }
-    }
-
-    private void AddBots(int count)
-    {
-        string teamCmd = g_Main.botTeam == CsTeam.Terrorist ? "t" : "ct";
-
-        for (int i = 0; i < count; i++)
-        {
-            Server.ExecuteCommand($"bot_add_{teamCmd}");
-        }
-    }
-
-    private HookResult OnPlayerConnectFull(EventPlayerConnectFull @event, GameEventInfo info)
-    {
-        try
-        {
-            var player = @event.Userid;
-            if (player == null || !player.IsValid || player.IsBot || player.IsHLTV)
-                return HookResult.Continue;
-
-            Server.NextFrame(() =>
-            {
-                try
-                {
-                    if (!player.IsValid) return;
-
-                    int humanCount = GetHumanPlayerCount();
-
-                    // Check if wave mode should be disabled due to too many players
-                    if (g_Main.isWaveModeActive &&
-        humanCount > Config.MaxPlayersWithoutPassword &&
-                !g_Main.waveStartedWithOverride &&
-            Config.DisableWaveOnFifthPlayer)
-                    {
-                        Server.PrintToChatAll(Localizer["Wave.FifthPlayerJoined"]);
-                        Server.PrintToChatAll(Localizer["Wave.FifthPlayerJoinedThanks"]);
-                        DisableWaveMode();
-                    }
-
-                    // Handle new player joining during active wave
-                    if (g_Main.isWaveModeActive && !g_Main.waveModeJustActivated)
-                    {
-                        // Assign to T team immediately but they'll be dead until next round
-                        if (player.IsValid && !player.IsBot)
-                        {
-                            player.ChangeTeam(g_Main.humanTeam);
-                            g_Main.playersAssignedToTeam.Add(player.SteamID);
-
-                            // Notify the player
-                            player.PrintToChat(" {lime}[Bot Waves]{default} You've joined during an active wave. You'll spawn at the start of the next round!");
-                        }
-                    }
-                }
-                catch (Exception ex)
-                {
-                    Console.WriteLine($"[Bot Waves] Error in player connect: {ex.Message}");
-                }
-            });
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"[Bot Waves] Error in OnPlayerConnectFull: {ex.Message}");
-        }
-
-        return HookResult.Continue;
-    }
-
-    private HookResult OnPlayerDisconnect(EventPlayerDisconnect @event, GameEventInfo info)
-    {
-        try
-        {
-            var player = @event.Userid;
-            if (player == null || !player.IsValid || player.IsBot || player.IsHLTV)
-                return HookResult.Continue;
-
-            // Remove player from vote participants if they voted
-            g_Main.waveVoteParticipants.Remove(player.SteamID);
-
-   // Check after a short delay if server is now empty or if votes now meet threshold
- AddTimer(Config.DisconnectCheckDelay, () =>
-        {
-
-                try
-                {
-                    int remainingHumans = GetHumanPlayerCount();
-
-   if (remainingHumans == 0)
-             {
-       if (g_Main.isWaveModeActive)
-   {
-       DisableWaveMode();
-    }
-        g_Main.waveVoteParticipants.Clear();
+    // ============================================================
+    // CONSOLE COMMANDS
+    // ============================================================
     
-         // Reset bot quota to default when server becomes empty
-        if (g_Main.isBotsDisabledByCommand)
-           {
-   g_Main.isBotsDisabledByCommand = false;
-         Server.ExecuteCommand($"bot_quota {Config.BotQuotaNormal}");
-       }
-   
-                return;
+    /// <summary>
+    /// !wave command - Vote to toggle wave mode or start with specific bot count.
+    /// Usage: !wave [botcount] [password]
+    /// </summary>
+    [ConsoleCommand("css_wave", "Toggle wave mode or set bot count")]
+    [CommandHelper(minArgs: 0, usage: "[botcount] [password]", whoCanExecute: CommandUsage.CLIENT_ONLY)]
+    public void OnWaveCommand(CCSPlayerController? player, CommandInfo command)
+    {
+        if (!IsValidHuman(player)) return;
+        
+        var arg1 = command.ArgCount > 1 ? command.GetArg(1).Trim() : "";
+        var arg2 = command.ArgCount > 2 ? command.GetArg(2).Trim() : "";
+        
+        Debug("CMD", $"!wave from {player!.PlayerName}: arg1='{arg1}', arg2='{(string.IsNullOrEmpty(arg2) ? "" : "(password)")}'");
+        
+        // No arguments = vote to toggle
+        if (string.IsNullOrEmpty(arg1))
+        {
+            HandleVote(player);
+            return;
         }
-
-                    // Edge case: If only 1 player left and they voted to disable, disable wave mode
-                    if (remainingHumans == 1 && g_Main.isWaveModeActive && g_Main.waveVoteParticipants.Count == 1)
-                    {
-                        DisableWaveMode();
-                        Server.PrintToChatAll(Localizer["Wave.TurnedOff"]);
-                        g_Main.waveVoteParticipants.Clear();
-                        return;
-                    }
-
-                    // Recalculate if vote threshold is now met with fewer players
-                    if (g_Main.waveVoteParticipants.Count > 0)
-                    {
-                        int votesNeeded = Math.Max(2, (int)Math.Ceiling(remainingHumans * Config.WaveVoteThreshold));
-                        int currentVotes = g_Main.waveVoteParticipants.Count;
-
-                        if (currentVotes >= votesNeeded)
-                        {
-                            if (g_Main.isWaveModeActive)
-                            {
-                                // Vote to disable passed
-                                Server.PrintToChatAll(Localizer["Wave.Vote.PassedDisable"]);
-                                g_Main.waveVoteParticipants.Clear();
-                                DisableWaveMode();
-                            }
-                            else
-                            {
-                                // Vote to enable passed
-                                Server.PrintToChatAll(Localizer["Wave.Vote.PassedEnable"]);
-                                g_Main.waveVoteParticipants.Clear();
-                                EnableWaveMode(1, false);
-                            }
-                        }
-                    }
-                }
-                catch (Exception ex)
+        
+        // Parse bot count
+        if (!int.TryParse(arg1, out var botCount) || botCount <= 0)
+        {
+            player.PrintToChat(Localizer["Wave.InvalidNumber"]);
+            return;
+        }
+        
+        // Check for admin password
+        var isAdmin = !string.IsNullOrEmpty(arg2) && 
+                      !string.IsNullOrEmpty(Config.AdminPassword) &&
+                      arg2 == Config.AdminPassword;
+        
+        Debug("CMD", $"BotCount={botCount}, IsAdmin={isAdmin}");
+        
+        // If wave mode active, just change bot count
+        if (_state.IsActive)
+        {
+            _state.BotCount = botCount;
+            _state.ConsecutiveFailures = 0;
+            
+            // PRE-SPAWN BOTS: Kick existing and add new count before restart
+            Debug("WAVE", $"Changing bot count to {botCount}, pre-spawning before restart...");
+            Server.ExecuteCommand("bot_kick");
+            var humanCount = GetHumanPlayerCount();
+            var totalQuota = humanCount + botCount;
+            Server.ExecuteCommand("bot_join_team ct");
+            Server.ExecuteCommand($"bot_quota {totalQuota}");
+            
+            // Small delay to let bots join before restart
+            AddTimer(0.3f, () =>
+            {
+                if (_state.IsActive)
                 {
-                    Console.WriteLine($"[Bot Waves] Error in disconnect timer: {ex.Message}");
+                    DebugBotStatus("BEFORE BOT COUNT CHANGE RESTART");
+                    Server.ExecuteCommand("mp_restartgame 1");
                 }
             });
+            
+            Server.PrintToChatAll(Localizer["Wave.BotCountChanged", botCount]);
+            Debug("WAVE", $"Bot count changed to {botCount}");
+            return;
         }
-        catch (Exception ex)
+        
+        // Check player limit
+        var playerCount = GetHumanPlayerCount();
+        if (playerCount > Config.MaxPlayersAllowed && !isAdmin)
         {
-            Console.WriteLine($"[Bot Waves] Error in OnPlayerDisconnect: {ex.Message}");
+            player.PrintToChat(Localizer["Wave.TooManyPlayers", Config.MaxPlayersAllowed]);
+            return;
         }
-
-        return HookResult.Continue;
+        
+        // Admin override - start immediately
+        if (isAdmin)
+        {
+            EnableWaveMode(botCount, adminOverride: true);
+            Server.PrintToChatAll(Localizer["Wave.AdminStart", botCount]);
+            return;
+        }
+        
+        // Otherwise just vote
+        HandleVote(player);
+    }
+    
+    /// <summary>
+    /// !dif command - Toggle difficulty between Easy and Hard.
+    /// </summary>
+    [ConsoleCommand("css_dif", "Toggle difficulty")]
+    [ConsoleCommand("css_diff", "Toggle difficulty")]
+    [CommandHelper(minArgs: 0, usage: "", whoCanExecute: CommandUsage.CLIENT_ONLY)]
+    public void OnDifficultyCommand(CCSPlayerController? player, CommandInfo command)
+    {
+        if (!IsValidHuman(player)) return;
+        
+        Debug("CMD", $"!dif from {player!.PlayerName}");
+        
+        if (!_state.IsActive)
+        {
+            player.PrintToChat(Localizer["Wave.NeedWaveActive"]);
+            return;
+        }
+        
+        ToggleDifficulty();
     }
 
-    private HookResult OnPlayerTeam(EventPlayerTeam @event, GameEventInfo info)
+    // ============================================================
+    // CHAT HANDLER
+    // ============================================================
+    
+    /// <summary>
+    /// Handles chat messages for wave and dif triggers (without ! prefix).
+    /// Commands with ! prefix are handled by the console command system.
+    /// </summary>
+    private HookResult OnPlayerChat(CCSPlayerController? player, CommandInfo command)
     {
-        try
+        if (!IsValidHuman(player)) return HookResult.Continue;
+        
+        var msg = command.GetArg(1).Trim().ToLowerInvariant();
+        
+        // Skip commands with ! prefix - they're handled by console commands
+        if (msg.StartsWith('!'))
         {
-            if (!g_Main.isWaveModeActive) return HookResult.Continue;
-
-            var player = @event.Userid;
-            if (player == null || !player.IsValid || player.IsHLTV)
-                return HookResult.Continue;
-
-            int newTeam = @event.Team;
-            int humanTeamNum = (int)g_Main.humanTeam;
-            int botTeamNum = (int)g_Main.botTeam;
-
-            // Handle human players - force to T side
-            if (!player.IsBot)
-            {
-                // Allow spectator switches
-                if (newTeam == (int)CsTeam.Spectator)
-                {
-                    return HookResult.Continue;
-                }
-
-                if (newTeam != humanTeamNum && newTeam != (int)CsTeam.None && newTeam != (int)CsTeam.Spectator)
-                {
-                    Server.NextFrame(() =>
-                        {
-                            if (player.IsValid && !player.IsBot)
-                            {
-                                player.ChangeTeam(g_Main.humanTeam);
-                                g_Main.playersAssignedToTeam.Add(player.SteamID);
-                            }
-                        });
-                }
-                else if (newTeam == humanTeamNum)
-                {
-                    g_Main.playersAssignedToTeam.Add(player.SteamID);
-                }
-            }
-            // Handle bots - force to CT side
-            else if (player.IsBot)
-            {
-                if (newTeam != botTeamNum && newTeam != (int)CsTeam.None)
-                {
-                    Server.NextFrame(() =>
-                 {
-                     if (player.IsValid && player.IsBot)
-                     {
-                         player.ChangeTeam(g_Main.botTeam);
-                     }
-                 });
-                }
-            }
+            return HookResult.Continue;
         }
-        catch (Exception ex)
+        
+        // wave (without !)
+        if (msg == "wave")
         {
-            Console.WriteLine($"[Bot Waves] Error in OnPlayerTeam: {ex.Message}");
+            HandleVote(player!);
+            return HookResult.Continue;
         }
-
-        return HookResult.Continue;
-    }
-
-    private HookResult OnPlayerSpawn(EventPlayerSpawn @event, GameEventInfo info)
-    {
-        try
+        
+        // dif or diff (without !)
+        if (msg is "dif" or "diff")
         {
-            if (!g_Main.isWaveModeActive) return HookResult.Continue;
-
-            var player = @event.Userid;
-            if (player == null || !player.IsValid || player.IsBot || player.IsHLTV)
-                return HookResult.Continue;
-
-            // Only correct team if player is on wrong team AND not already tracked as assigned
-            if (player.Team != g_Main.humanTeam && !g_Main.playersAssignedToTeam.Contains(player.SteamID))
+            if (!_state.IsActive)
             {
-                Server.NextFrame(() =>
-                    {
-                        if (player.IsValid && !player.IsBot)
-                        {
-                            player.ChangeTeam(g_Main.humanTeam);
-                            g_Main.playersAssignedToTeam.Add(player.SteamID);
-                        }
-                    });
-            }
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"[Bot Waves] Error in OnPlayerSpawn: {ex.Message}");
-        }
-
-        return HookResult.Continue;
-    }
-
-    private HookResult OnPlayerDeath(EventPlayerDeath @event, GameEventInfo info)
-    {
-        try
-        {
-            var victim = @event.Userid;
-            var attacker = @event.Attacker;
-
-            // Track kills if wave mode is active
-            if (g_Main.isWaveModeActive && victim != null && victim.IsValid && attacker != null && attacker.IsValid)
-            {
-                // Only count bot kills by human players
-                if (victim.IsBot && !attacker.IsBot && victim.Team == g_Main.botTeam && attacker.Team == g_Main.humanTeam)
-                {
-                    if (!g_Main.roundKills.ContainsKey(attacker.SteamID))
-                    {
-                        g_Main.roundKills[attacker.SteamID] = 0;
-                    }
-                    g_Main.roundKills[attacker.SteamID]++;
-                }
-            }
-
-            // Handle auto-respawn system for bots
-            if (!g_Main.isWaveModeActive || !g_Main.autoRespawnEnabled) return HookResult.Continue;
-
-            if (victim == null || !victim.IsValid || !victim.IsBot) return HookResult.Continue;
-
-            if (victim.Team != g_Main.botTeam) return HookResult.Continue;
-
-            g_Main.respawnsUsed++;
-            int respawnsRemaining = g_Main.respawnsNeeded - g_Main.respawnsUsed;
-
-            if (g_Main.respawnsUsed >= g_Main.respawnsNeeded)
-            {
-                Server.ExecuteCommand("mp_respawn_on_death_ct 0");
-                g_Main.autoRespawnEnabled = false;
-
-                if (Config.ShowRespawnMessages)
-                {
-                    Server.PrintToChatAll(Localizer["Wave.NoMoreRespawns"]);
-                }
+                player!.PrintToChat(Localizer["Wave.NeedWaveActive"]);
             }
             else
             {
-                if (Config.ShowRespawnMessages && (g_Main.respawnsUsed % Config.ShowRespawnEveryXDeaths == 0 || respawnsRemaining <= 3))
-                {
-                    Server.PrintToChatAll(Localizer["Wave.RespawnsLeft", respawnsRemaining]);
-                }
+                ToggleDifficulty();
             }
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"[Bot Waves] Error in OnPlayerDeath: {ex.Message}");
-        }
-
-        return HookResult.Continue;
-    }
-
-    private HookResult OnPlayerSay(CCSPlayerController? player, CommandInfo commandInfo)
-    {
-        try
-        {
-            if (player == null || !player.IsValid || player.IsBot || player.IsHLTV)
-                return HookResult.Continue;
-
-            string message = commandInfo.GetArg(1).Trim().ToLower();
-
-         Console.WriteLine($"[Bot Waves] OnPlayerSay: Player '{player.PlayerName}' said: '{message}' (Length: {message.Length})");
-
-       // Check if message is "wave" or "!wave" (without additional parameters)
-            // Be more lenient - handle "wave", "!wave", and even just "!" + "wave" with spaces
-   if (message == "wave" || message == "!wave" || message.StartsWith("!wave ") || message.StartsWith("wave "))
-   {
-   Console.WriteLine($"[Bot Waves] OnPlayerSay: Detected wave command, calling HandleWaveVote");
-    HandleWaveVote(player);
-      return HookResult.Handled;
-   }
-    // Check if message is "bot" or "!bot"
-  else if (message == "bot" || message == "!bot" || message.StartsWith("!bot ") || message.StartsWith("bot "))
-          {
-    Console.WriteLine($"[Bot Waves] OnPlayerSay: Detected bot command, calling HandleBotToggle");
-     HandleBotToggle(player);
-  return HookResult.Handled;
-            }
-        }
-        catch (Exception ex)
-        {
- Console.WriteLine($"[Bot Waves] Error in OnPlayerSay: {ex.Message}");
-        }
-
-        return HookResult.Continue;
-    }
-
-    private void HandleWaveVote(CCSPlayerController player)
-    {
-        try
-        {
-       Console.WriteLine($"[Bot Waves] HandleWaveVote called by {player.PlayerName}");
-     
-         int humanPlayerCount = GetHumanPlayerCount();
-      
-          Console.WriteLine($"[Bot Waves] Human player count: {humanPlayerCount}, Wave mode active: {g_Main.isWaveModeActive}");
-
-      // Special case: If only 1 player on server, immediately toggle wave mode
-  if (humanPlayerCount == 1)
-     {
-     if (g_Main.isWaveModeActive)
-       {
-      Console.WriteLine($"[Bot Waves] Single player - disabling wave mode");
-          DisableWaveMode();
-          player.PrintToChat(Localizer["Wave.TurnedOff"]);
-    }
-       else
-       {
-    Console.WriteLine($"[Bot Waves] Single player - enabling wave mode");
-         EnableWaveMode(1, false);
-         }
-  return;
-       }
-
-            // Add player to vote participants
-            g_Main.waveVoteParticipants.Add(player.SteamID);
-
-            // Calculate votes needed (minimum 2 votes required)
-            int votesNeeded = Math.Max(2, (int)Math.Ceiling(humanPlayerCount * Config.WaveVoteThreshold));
-            int currentVotes = g_Main.waveVoteParticipants.Count;
-
-            // Determine if voting to enable or disable
-            bool votingToEnable = !g_Main.isWaveModeActive;
-
-            // Broadcast vote status
-            string voteMessage = votingToEnable
-                 ? Localizer["Wave.Vote.Enable", player.PlayerName, currentVotes, votesNeeded]
-                : Localizer["Wave.Vote.Disable", player.PlayerName, currentVotes, votesNeeded];
-
-            Server.PrintToChatAll(voteMessage);
-
-            // Check if threshold met
-            if (currentVotes >= votesNeeded)
-            {
-                if (votingToEnable)
-                {
-                    // Enable wave mode
-                    Server.PrintToChatAll(Localizer["Wave.Vote.PassedEnable"]);
-             g_Main.waveVoteParticipants.Clear();
-            EnableWaveMode(1, false);
-                }
-                else
-                {
-                    // Disable wave mode
-                    Server.PrintToChatAll(Localizer["Wave.Vote.PassedDisable"]);
-                    g_Main.waveVoteParticipants.Clear();
-                    DisableWaveMode();
-                }
-            }
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"[Bot Waves] Error in HandleWaveVote: {ex.Message}");
-        }
-    }
-
-    private HookResult OnRoundStart(EventRoundStart @event, GameEventInfo info)
-    {
-        try
-        {
-            if (!g_Main.isWaveModeActive) return HookResult.Continue;
-
-            // Mark that we're now in an active round
-            g_Main.isRoundActive = true;
-
-            // CRITICAL: Always disable respawn at the start of every wave to prevent leftover state
-            Server.ExecuteCommand("mp_respawn_on_death_ct 0");
-
-            // Reset auto-respawn tracking variables
-            g_Main.autoRespawnEnabled = false;
-            g_Main.respawnsNeeded = 0;
-            g_Main.respawnsUsed = 0;
-
-            // Kill any existing spawn timer
-            g_Main._botSpawnTimer?.Kill();
-            g_Main._botSpawnTimer = null;
-
-            Server.NextFrame(() => DoRoundStart());
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"[Bot Waves] Error in OnRoundStart: {ex.Message}");
-        }
-
-        return HookResult.Continue;
-    }
-
-    private void DoRoundStart()
-    {
-        try
-        {
-            // Reset kill tracking for new round
-            g_Main.roundKills.Clear();
-            g_Main.roundParticipants.Clear();
-
-            SetRoundTime(g_Main.currentWaveBotCount);
-
-            // Force all humans to T side
-            var humans = Utilities.GetPlayers().Where(p => p != null && p.IsValid && !p.IsBot && !p.IsHLTV).ToList();
-
-            foreach (var human in humans)
-            {
-                if (IsSpectator(human))
-                {
-                    continue;
-                }
-
-                // Mark as participant and initialize kill count
-                g_Main.roundParticipants.Add(human.SteamID);
-                if (!g_Main.roundKills.ContainsKey(human.SteamID))
-                {
-                    g_Main.roundKills[human.SteamID] = 0;
-                }
-
-                if (human.Team != g_Main.humanTeam)
-                {
-                    human.ChangeTeam(g_Main.humanTeam);
-                    g_Main.playersAssignedToTeam.Add(human.SteamID);
-                }
-                else
-                {
-                    g_Main.playersAssignedToTeam.Add(human.SteamID);
-                }
-            }
-
-            // Store player count for wave increment calculation
-            int humanPlayerCount = humans.Where(p => !IsSpectator(p)).Count();
-            g_Main.humanPlayerCountAtRoundStart = humanPlayerCount;
-
-            // Spawn bots
-            var existingBots = Utilities.GetPlayers().Count(p => p != null && p.IsValid && p.IsBot && !p.IsHLTV);
-            int waveTarget = g_Main.currentWaveBotCount;
-
-            if (existingBots < waveTarget)
-            {
-                int toSpawn = waveTarget - existingBots;
-                AddBots(toSpawn);
-            }
-
-            AddTimer(Config.SpawnLimitCheckDelay, () => CheckSpawnLimit(waveTarget));
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"[Bot Waves] Error in round start: {ex.Message}");
-        }
-    }
-
-    private HookResult OnRoundEnd(EventRoundEnd @event, GameEventInfo info)
-    {
-        try
-        {
-            // Mark that the round is no longer active
-            g_Main.isRoundActive = false;
-
-            if (!g_Main.isWaveModeActive)
-            {
-                return HookResult.Continue;
-            }
-
-            if (g_Main.waveModeJustActivated)
-            {
-                return HookResult.Continue;
-            }
-
-            // ===== DISPLAY KILL STATISTICS =====
-            if (g_Main.roundParticipants.Count > 0)
-            {
-                // Get all participants and their kill counts, sorted by kills (descending)
-                var sortedStats = g_Main.roundParticipants
-                      .Select(steamId => new
-                      {
-                          SteamId = steamId,
-                          Kills = g_Main.roundKills.ContainsKey(steamId) ? g_Main.roundKills[steamId] : 0
-                      })
-                .OrderByDescending(x => x.Kills)
-                          .ToList();
-
-                // Find player names and print stats
-                foreach (var stat in sortedStats)
-                {
-                    var player = Utilities.GetPlayers().FirstOrDefault(p =>
-            p != null && p.IsValid && !p.IsBot && p.SteamID == stat.SteamId);
-
-        if (player != null)
-      {
-
-                        string localizedMessage = stat.Kills == 1
-                       ? Localizer["Wave.Stats.Kills", player.PlayerName, stat.Kills]
-                 : Localizer["Wave.Stats.KillsPlural", player.PlayerName, stat.Kills];
-
-                        Server.PrintToChatAll(localizedMessage);
-                    }
-                }
-            }
-
-            CsTeam winner = (CsTeam)@event.Winner;
-
-            if (winner == g_Main.humanTeam)
-            {
-                // RESET failure counter on win
-                g_Main.consecutiveWaveFailures = 0;
-
-                // Use stored player count from round start
-                int humanPlayersOnTeam = g_Main.humanPlayerCountAtRoundStart;
-
-                int increment = Math.Max(Config.MinimumWaveIncrement, humanPlayersOnTeam);
-
-                g_Main.currentWaveBotCount += increment;
-
-                if (Config.ShowWaveEndMessages)
-                {
-                    Server.PrintToChatAll(Localizer["Wave.YouWonNext", increment]);
-                }
-            }
-            else if (winner == g_Main.botTeam)
-            {
-                // Increment failure counter
-                g_Main.consecutiveWaveFailures++;
-
-                // Show failure counter in RED text
-                Server.PrintToChatAll(Localizer["Wave.FailureCounter", g_Main.consecutiveWaveFailures, Config.MaxFailuresBeforeReduction]);
-
-                // Check if we need to reduce difficulty
-                if (g_Main.consecutiveWaveFailures >= Config.MaxFailuresBeforeReduction)
-                {
-                    int oldBotCount = g_Main.currentWaveBotCount;
-
-                    // Calculate reduction percentage (from config)
-                    double reductionPercent = oldBotCount * (Config.WaveReductionPercentage / 100.0);
-                    int botsToRemove = Math.Max(1, (int)Math.Round(reductionPercent));
-
-                    // Apply reduction
-                    g_Main.currentWaveBotCount -= botsToRemove;
-
-                    // Ensure we never go below minimum bots per wave
-                    if (g_Main.currentWaveBotCount < Config.MinimumBotsPerWave)
-                    {
-                        g_Main.currentWaveBotCount = Config.MinimumBotsPerWave;
-                    }
-
-                    // Reset failure counter after reduction
-                    g_Main.consecutiveWaveFailures = 0;
-
-                    // Show difficulty reduction message
-                    Server.PrintToChatAll(Localizer["Wave.DifficultyReduced", g_Main.currentWaveBotCount, oldBotCount, g_Main.currentWaveBotCount, botsToRemove]);
-                }
-
-                if (Config.ShowWaveEndMessages)
-                {
-                    Server.PrintToChatAll(Localizer["Wave.YouLostTryAgain", g_Main.currentWaveBotCount]);
-                }
-            }
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"[Bot Waves] Error in OnRoundEnd: {ex.Message}");
-        }
-
-        return HookResult.Continue;
-    }
-
-    private int GetHumanPlayerCount()
-    {
-        return Utilities.GetPlayers().Count(p =>
-     p != null &&
-  p.IsValid &&
-       !p.IsBot &&
-    !p.IsHLTV &&
-       p.Connected == PlayerConnectedState.PlayerConnected
-        );
-    }
-
-  private int GetActivePlayerCount()
-   {
-      return Utilities.GetPlayers().Count(p =>
-       p != null &&
-      p.IsValid &&
-            !p.IsBot &&
-        !p.IsHLTV &&
-      !IsSpectator(p) &&
- p.Connected == PlayerConnectedState.PlayerConnected
-        );
- }
-
-    private bool IsSpectator(CCSPlayerController player)
-    {
-        return player.Team == CsTeam.Spectator;
-    }
-
-    // ===== Difficulty Helper =====
-    
-    private string GetDifficultyName()
-    {
-    if (g_Main.isZombieModeActive)
-        {
-       return "Easy (Knives Only)";
+            return HookResult.Continue;
         }
         
-        // If you want to add more difficulty levels later, add them here
-        return "Normal";
+        return HookResult.Continue;
     }
 
-    // ===== Round Time Management =====
-
-    private int CalculateRoundTimeSeconds(int waveNumber)
+    // ============================================================
+    // VOTING SYSTEM
+    // ============================================================
+    
+    /// <summary>
+    /// Handles a player's vote to toggle wave mode.
+    /// Solo players get instant toggle, multiplayer requires vote threshold.
+    /// </summary>
+    private void HandleVote(CCSPlayerController player)
     {
-        if (!Config.EnableDynamicRoundTime)
+        var playerCount = GetHumanPlayerCount();
+        Debug("VOTE", $"Vote from {player.PlayerName}, players={playerCount}");
+        
+        // Solo player = instant toggle
+        if (playerCount == 1)
         {
-            return Config.BaseRoundTimeSeconds;
-        }
-
-        if (waveNumber <= Config.WaveThresholdForTimeIncrease)
-        {
-            return Config.BaseRoundTimeSeconds;
-        }
-
-        int botsAboveThreshold = waveNumber - Config.WaveThresholdForTimeIncrease;
-        int additionalTime = botsAboveThreshold * Config.RoundTimeIncrementPerBot;
-        int totalSeconds = Config.BaseRoundTimeSeconds + additionalTime;
-
-        return totalSeconds;
-    }
-
-    private float SecondsToRoundTimeMinutes(int seconds)
-    {
-        return seconds / 60.0f;
-    }
-
-    private void SetRoundTime(int waveNumber)
-    {
-        if (!Config.EnableDynamicRoundTime)
-        {
+            Debug("VOTE", "Solo player, instant toggle");
+            if (_state.IsActive)
+            {
+                DisableWaveMode();
+                player.PrintToChat(Localizer["Wave.Disabled"]);
+            }
+            else
+            {
+                EnableWaveMode(startBots: 1, adminOverride: false);
+                Server.PrintToChatAll(Localizer["Wave.Enabled", 1]);
+            }
             return;
         }
-
-        int roundTimeSeconds = CalculateRoundTimeSeconds(waveNumber);
-        float roundTimeMinutes = SecondsToRoundTimeMinutes(roundTimeSeconds);
-        string roundTimeStr = roundTimeMinutes.ToString("F2", System.Globalization.CultureInfo.InvariantCulture);
-
-        Server.ExecuteCommand($"mp_roundtime {roundTimeStr}");
+        
+        // Check player limit when enabling
+        if (!_state.IsActive && playerCount > Config.MaxPlayersAllowed)
+        {
+            player.PrintToChat(Localizer["Wave.TooManyPlayers", Config.MaxPlayersAllowed]);
+            return;
+        }
+        
+        // Check if already voted
+        if (_state.Voters.Contains(player.SteamID))
+        {
+            player.PrintToChat(Localizer["Wave.AlreadyVoted"]);
+            return;
+        }
+        
+        // Add vote
+        _state.Voters.Add(player.SteamID);
+        
+        // Calculate threshold
+        var needed = Math.Max(2, (int)Math.Ceiling(playerCount * Config.VoteThreshold));
+        var current = _state.Voters.Count;
+        var action = _state.IsActive ? "disable" : "enable";
+        
+        Debug("VOTE", $"Votes: {current}/{needed} to {action}");
+        
+        // Broadcast vote
+        Server.PrintToChatAll(Localizer["Wave.VoteCast", player.PlayerName, current, needed, action]);
+        
+        // Check if threshold met
+        if (current >= needed)
+        {
+            Debug("VOTE", "Threshold met!");
+            _state.Voters.Clear();
+            
+            if (_state.IsActive)
+            {
+                DisableWaveMode();
+                Server.PrintToChatAll(Localizer["Wave.VotePassedDisable"]);
+            }
+            else
+            {
+                EnableWaveMode(startBots: 1, adminOverride: false);
+                Server.PrintToChatAll(Localizer["Wave.VotePassedEnable"]);
+            }
+        }
     }
 
-    private void ShowHelpMessagesIfNeeded()
+    // ============================================================
+    // WAVE MODE CONTROL
+    // ============================================================
+    
+    /// <summary>
+    /// Enables wave mode with specified starting bot count.
+    /// </summary>
+    private void EnableWaveMode(int startBots, bool adminOverride)
     {
-        try
- {
-     // Only show messages if wave mode is NOT active and we have 1-5 players
-     if (g_Main.isWaveModeActive || !Config.ShowHelpMessages)
-   return;
-
-       int humanCount = GetHumanPlayerCount();
-
-          if (humanCount >= 1 && humanCount <= Config.MaxPlayersWithoutPassword)
-   {
-     Server.PrintToChatAll(Localizer["Wave.HelpMessage"]);
-
-    // Show bot toggle help message only if feature is enabled and exactly 1 active player
-            int activePlayers = GetActivePlayerCount();
-          if (Config.EnableBotQuotaToggle && activePlayers == 1)
-    {
-       // Show appropriate bot message based on current state
-       if (g_Main.isBotsDisabledByCommand)
-     {
-      Server.PrintToChatAll(Localizer["Bot.HelpMessage.AddBot"]);
+        Debug("WAVE", $"=== ENABLING WAVE MODE ===");
+        Debug("WAVE", $"StartBots={startBots}, AdminOverride={adminOverride}");
+        
+        // Initialize state
+        _state.Initialize(startBots, adminOverride);
+        DebugState();
+        
+        // Kick all existing bots first - they may be on wrong team
+        Debug("WAVE", "Kicking existing bots...");
+        Server.ExecuteCommand("bot_quota 0");
+        Server.ExecuteCommand("bot_kick");
+        
+        // Configure server cvars
+        ConfigureServerCvars();
+        
+        // Set initial difficulty (Easy mode)
+        ApplyDifficulty(easy: true);
+        
+        // Move all humans to T team
+        Debug("WAVE", "Moving humans to T team...");
+        foreach (var player in Utilities.GetPlayers())
+        {
+            if (IsValidHuman(player) && player.Team != _state.HumanTeam)
+            {
+                Debug("WAVE", $"Moving {player.PlayerName} from {player.Team} to {_state.HumanTeam}");
+                player.ChangeTeam(_state.HumanTeam);
+            }
+        }
+        
+        // PRE-SPAWN BOTS: Add bots BEFORE restart so they're on the server when round starts
+        Debug("WAVE", $"Pre-spawning {startBots} bots before restart...");
+        var humanCount = GetHumanPlayerCount();
+        var totalQuota = humanCount + startBots;
+        Server.ExecuteCommand("bot_join_team ct");
+        Server.ExecuteCommand($"bot_quota {totalQuota}");
+        
+        // Schedule round restart - bots are already on server, will spawn with the round
+        Debug("WAVE", "Scheduling round restart...");
+        AddTimer(0.5f, () =>
+        {
+            if (_state.IsActive)
+            {
+                Debug("WAVE", "Executing mp_restartgame 1");
+                DebugBotStatus("BEFORE RESTART");
+                Server.ExecuteCommand("mp_restartgame 1");
+            }
+        });
+        
+        Debug("WAVE", "=== WAVE MODE ENABLED ===");
     }
+    
+    /// <summary>
+    /// Disables wave mode and restores server settings.
+    /// </summary>
+    private void DisableWaveMode()
+    {
+        Debug("WAVE", "=== DISABLING WAVE MODE ===");
+        
+        // Re-enable normal gameplay
+        Server.ExecuteCommand("mp_ignore_round_win_conditions 0");
+        
+        // Remove wave mode bots but keep 1 for normal gameplay
+        Debug("WAVE", "Resetting bots for normal play...");
+        Server.ExecuteCommand("bot_kick");
+        
+        // Restore default cvars
+        RestoreServerCvars();
+        
+        // Set bot quota to allow 1 bot for normal gameplay
+        Server.ExecuteCommand("bot_quota 1");
+        
+        // Reset state
+        _state.Reset();
+        _state.KillAllTimers();
+        
+        Debug("WAVE", "=== WAVE MODE DISABLED ===");
+        DebugState();
+    }
+    
+    /// <summary>
+    /// Toggles between Easy and Hard difficulty.
+    /// </summary>
+    private void ToggleDifficulty()
+    {
+        _state.IsEasyMode = !_state.IsEasyMode;
+        Debug("WAVE", $"=== TOGGLING DIFFICULTY to {(_state.IsEasyMode ? "EASY" : "HARD")} ===");
+        
+        // Must kick bots and restart for difficulty to apply
+        Server.ExecuteCommand("bot_quota 0");
+        Server.ExecuteCommand("bot_kick");
+        
+        ApplyDifficulty(_state.IsEasyMode);
+        
+        var msg = _state.IsEasyMode ? Localizer["Wave.DifficultyEasy"] : Localizer["Wave.DifficultyHard"];
+        Server.PrintToChatAll(msg);
+        
+        // PRE-SPAWN BOTS: Add bots BEFORE restart so they spawn with the round
+        Debug("WAVE", $"Pre-spawning {_state.BotCount} bots before restart...");
+        var humanCount = GetHumanPlayerCount();
+        var totalQuota = humanCount + _state.BotCount;
+        Server.ExecuteCommand("bot_join_team ct");
+        Server.ExecuteCommand($"bot_quota {totalQuota}");
+        
+        // Small delay to let bots join before restart
+        AddTimer(0.3f, () =>
+        {
+            if (_state.IsActive)
+            {
+                DebugBotStatus("BEFORE DIFFICULTY RESTART");
+                Server.ExecuteCommand("mp_restartgame 1");
+                Debug("WAVE", "Round restarting with new difficulty");
+            }
+        });
+    }
+    
+    /// <summary>
+    /// Applies difficulty cvars for CS2.
+    /// Values 1-5: 1=bots don't shoot, 2=easy, 3=normal, 4=hard, 5=expert
+    /// </summary>
+    private void ApplyDifficulty(bool easy)
+    {
+        Debug("CVAR", $"Applying difficulty: {(easy ? "EASY" : "HARD")}");
+        
+        var difficulty = easy ? Difficulty.Easy : Difficulty.Hard;
+        Server.ExecuteCommand($"bot_difficulty {difficulty}");
+        Server.ExecuteCommand($"custom_bot_difficulty {difficulty}");
+    }
+    
+    /// <summary>
+    /// Configures server cvars for wave mode.
+    /// </summary>
+    private void ConfigureServerCvars()
+    {
+        Debug("CVAR", "=== CONFIGURING SERVER ===");
+        
+        // Disable auto-balance first
+        Server.ExecuteCommand("mp_autoteambalance 0");
+        Server.ExecuteCommand("mp_limitteams 0");
+        Server.ExecuteCommand("mp_force_pick_time 0");
+        
+        // Force bots to CT
+        Server.ExecuteCommand("bot_join_team ct");
+        Server.ExecuteCommand("bot_quota_mode fill");
+        
+        // Disable difficulty auto-adjust
+        Server.ExecuteCommand("sv_auto_adjust_bot_difficulty false");
+        
+        // Prevent round end during setup
+        Server.ExecuteCommand("mp_ignore_round_win_conditions 1");
+        
+        // Bots should NOT respawn - players must kill all bots to win the wave
+        Server.ExecuteCommand("mp_respawn_on_death_ct 0");
+        Server.ExecuteCommand("mp_respawn_on_death_t 0");
+        
+        // Additional respawn prevention for deathmatch/casual modes
+        Server.ExecuteCommand("mp_dm_bonus_length_max 0");
+        Server.ExecuteCommand("mp_dm_bonus_length_min 0");
+        Server.ExecuteCommand("mp_dm_time_between_bonus_max 9999");
+        Server.ExecuteCommand("mp_dm_time_between_bonus_min 9999");
+        
+        // Misc settings
+        Server.ExecuteCommand("mp_warmuptime 0");
+        Server.ExecuteCommand("mp_forcecamera 1");
+        
+        // Third-party plugin integration
+        if (Config.DisableSkillAutoBalance)
+        {
+            Server.ExecuteCommand("css_skill_autobalance_minplayers 30");
+        }
+        
+        Debug("CVAR", "=== SERVER CONFIGURED ===");
+    }
+    
+    /// <summary>
+    /// Restores default server cvars.
+    /// </summary>
+    private void RestoreServerCvars()
+    {
+        Debug("CVAR", "Restoring default cvars...");
+        
+        Server.ExecuteCommand("mp_autoteambalance 1");
+        Server.ExecuteCommand("mp_limitteams 2");
+        Server.ExecuteCommand("mp_ignore_round_win_conditions 0");
+        Server.ExecuteCommand("mp_respawn_on_death_ct 0");
+        Server.ExecuteCommand("bot_join_team any");
+        Server.ExecuteCommand("bot_quota_mode fill");
+        Server.ExecuteCommand("sv_auto_adjust_bot_difficulty true");
+        
+        if (Config.DisableSkillAutoBalance)
+        {
+            Server.ExecuteCommand("css_skill_autobalance_minplayers 5");
+        }
+    }
+
+    // ============================================================
+    // GAME EVENTS
+    // ============================================================
+    
+    private HookResult OnPlayerConnectFull(EventPlayerConnectFull @event, GameEventInfo info)
+    {
+        var player = @event.Userid;
+        if (!IsValidHuman(player)) return HookResult.Continue;
+        
+        Debug("EVENT", $"Player connected: {player!.PlayerName}");
+        
+        Server.NextFrame(() =>
+        {
+            if (!player.IsValid) return;
+            
+            var count = GetHumanPlayerCount();
+            Debug("EVENT", $"Player count now: {count}");
+            
+            // Check if we should disable wave mode due to player limit
+            if (_state.IsActive && 
+                !_state.StartedWithOverride && 
+                Config.DisableOnPlayerLimitExceeded &&
+                count > Config.MaxPlayersAllowed)
+            {
+                Debug("EVENT", "Player limit exceeded, disabling wave mode");
+                Server.PrintToChatAll(Localizer["Wave.PlayerLimitExceeded"]);
+                DisableWaveMode();
+            }
+        });
+        
+        return HookResult.Continue;
+    }
+    
+    private HookResult OnPlayerDisconnect(EventPlayerDisconnect @event, GameEventInfo info)
+    {
+        var player = @event.Userid;
+        if (player is null || player.IsBot) return HookResult.Continue;
+        
+        Debug("EVENT", $"Player disconnected: {player.PlayerName}");
+        
+        // Remove their vote
+        _state.Voters.Remove(player.SteamID);
+        
+        // Check if server is empty after delay
+        AddTimer(Config.DisconnectCheckDelay, () =>
+        {
+            var remaining = GetHumanPlayerCount();
+            Debug("EVENT", $"Post-disconnect check: {remaining} players");
+            
+            if (remaining == 0 && _state.IsActive)
+            {
+                Debug("EVENT", "Server empty, disabling wave mode");
+                DisableWaveMode();
+            }
+        });
+        
+        return HookResult.Continue;
+    }
+    
+    private HookResult OnPlayerTeam(EventPlayerTeam @event, GameEventInfo info)
+    {
+        if (!_state.IsActive) return HookResult.Continue;
+        
+        var player = @event.Userid;
+        if (player is null || !player.IsValid) return HookResult.Continue;
+        
+        var newTeam = (CsTeam)@event.Team;
+        Debug("TEAM", $"{player.PlayerName} (Bot={player.IsBot}) -> {newTeam}");
+        
+        // Force humans to T team, bots to CT team
+        Server.NextFrame(() =>
+        {
+            if (!player.IsValid) return;
+            
+            if (player.IsBot && newTeam != _state.BotTeam && newTeam != CsTeam.None)
+            {
+                Debug("TEAM", $"Forcing bot to {_state.BotTeam}");
+                player.ChangeTeam(_state.BotTeam);
+            }
+            else if (!player.IsBot && newTeam == _state.BotTeam)
+            {
+                Debug("TEAM", $"Forcing human to {_state.HumanTeam}");
+                player.ChangeTeam(_state.HumanTeam);
+            }
+        });
+        
+        return HookResult.Continue;
+    }
+    
+    private HookResult OnRoundStart(EventRoundStart @event, GameEventInfo info)
+    {
+        Debug("ROUND", "=== ROUND START ===");
+        DebugState();
+        DebugBotStatus("ROUND START - INITIAL");
+        
+        if (!_state.IsActive) return HookResult.Continue;
+        
+        _state.IsRoundActive = true;
+        _state.ResetRound();
+        
+        // Kill existing spawn timer
+        if (_state.SpawnCheckTimer != null)
+        {
+            _state.SpawnCheckTimer.Kill();
+            _state.SpawnCheckTimer = null;
+        }
+        
+        Server.NextFrame(() => SetupRound());
+        
+        return HookResult.Continue;
+    }
+    
+    private HookResult OnRoundEnd(EventRoundEnd @event, GameEventInfo info)
+    {
+        var winner = (CsTeam)@event.Winner;
+        Debug("ROUND", $"=== ROUND END: Winner={winner} ===");
+        
+        _state.IsRoundActive = false;
+        
+        // Disable respawns at round end
+        if (_state.RespawnEnabled)
+        {
+            Debug("RESPAWN", "Round ended, disabling respawns");
+            Server.ExecuteCommand("mp_respawn_on_death_ct 0");
+            _state.RespawnEnabled = false;
+        }
+        
+        if (!_state.IsActive) return HookResult.Continue;
+        
+        // Skip first round after activation
+        if (_state.JustActivated)
+        {
+            Debug("ROUND", "Skipping first round (JustActivated)");
+            _state.JustActivated = false;
+            return HookResult.Continue;
+        }
+        
+        // Process result
+        if (winner == _state.HumanTeam)
+        {
+            HandleVictory();
+        }
+        else if (winner == _state.BotTeam)
+        {
+            HandleDefeat();
+        }
+        
+        DebugState();
+        return HookResult.Continue;
+    }
+    
+    /// <summary>
+    /// Handles bot deaths for respawn tracking.
+    /// When respawns are enabled, tracks kills and disables respawns when enough kills achieved.
+    /// </summary>
+    private HookResult OnPlayerDeath(EventPlayerDeath @event, GameEventInfo info)
+    {
+        if (!_state.IsActive || !_state.IsRoundActive) return HookResult.Continue;
+        
+        var victim = @event.Userid;
+        if (victim is null || !victim.IsValid || !victim.IsBot) return HookResult.Continue;
+        
+        // Only track CT bot deaths
+        if (victim.Team != _state.BotTeam) return HookResult.Continue;
+        
+        // Track kills when respawn system is active
+        if (_state.RespawnEnabled)
+        {
+            _state.CurrentKills++;
+            Debug("RESPAWN", $"Bot killed: {victim.PlayerName}, Kills={_state.CurrentKills}/{_state.TotalKillsNeeded}, RespawnsRemaining={_state.RespawnsRemaining}");
+            
+            // Decrement respawns remaining
+            if (_state.RespawnsRemaining > 0)
+            {
+                _state.RespawnsRemaining--;
+                Debug("RESPAWN", $"Respawn used, remaining: {_state.RespawnsRemaining}");
+                
+                // If no more respawns, disable the cvar - remaining bots won't respawn
+                if (_state.RespawnsRemaining <= 0)
+                {
+                    Debug("RESPAWN", "No respawns remaining, disabling mp_respawn_on_death_ct");
+                    Server.ExecuteCommand("mp_respawn_on_death_ct 0");
+                }
+            }
+        }
         else
-      {
-   Server.PrintToChatAll(Localizer["Bot.HelpMessage.RemoveBot"]);
-  }
-  }
-      }
-        }
-        catch (Exception ex)
         {
-Console.WriteLine($"[Bot Waves] Error in ShowHelpMessagesIfNeeded: {ex.Message}");
-     }
+            Debug("RESPAWN", $"Bot died: {victim.PlayerName} (respawns not enabled)");
+        }
+        
+        return HookResult.Continue;
     }
-
-    [ConsoleCommand("css_waveoff", "Disable Bot Wave mode")]
-    [CommandHelper(minArgs: 0, usage: "", whoCanExecute: CommandUsage.CLIENT_ONLY)]
-    public void OnWaveOffCommand(CCSPlayerController? player, CommandInfo commandInfo)
+    
+    /// <summary>
+    /// Handles player spawns. In Easy mode, strips weapons from bots so they only have knives.
+    /// </summary>
+    private HookResult OnPlayerSpawn(EventPlayerSpawn @event, GameEventInfo info)
     {
-        if (player == null || !player.IsValid) return;
-
-        try
+        if (!_state.IsActive) return HookResult.Continue;
+        
+        var player = @event.Userid;
+        if (player is null || !player.IsValid || !player.IsBot) return HookResult.Continue;
+        
+        // Only process bots on the bot team
+        if (player.Team != _state.BotTeam) return HookResult.Continue;
+        
+        // In Easy mode, strip weapons so bots only have knives
+        if (_state.IsEasyMode)
         {
-            int humanPlayerCount = GetHumanPlayerCount();
-            int votesNeeded = Math.Max(2, (int)Math.Ceiling(humanPlayerCount * Config.WaveVoteThreshold));
-            int currentVotes = g_Main.waveVoteParticipants.Count;
-
-            player.PrintToChat(Localizer["Wave.Vote.UseWaveToStop", currentVotes, votesNeeded]);
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"[Bot Waves] Error in waveoff command: {ex.Message}");
-        }
-    }
-
-    [ConsoleCommand("css_z", "Toggle zombie mode")]
-    [ConsoleCommand("css_zombie", "Toggle zombie mode")]
-    [CommandHelper(minArgs: 0, usage: "", whoCanExecute: CommandUsage.CLIENT_ONLY)]
-    public void OnZombieCommand(CCSPlayerController? player, CommandInfo commandInfo)
-    {
-        if (player == null || !player.IsValid) return;
-
-        try
-        {
-      if (!g_Main.isWaveModeActive)
-  {
-      player.PrintToChat(Localizer["Wave.ZombieNeedWaveActive"]);
-          return;
-            }
-
-            ToggleZombieMode();
-        }
-        catch (Exception ex)
-        {
-Console.WriteLine($"[Bot Waves] Error in zombie command: {ex.Message}");
-        }
-    }
-
-  [ConsoleCommand("css_bot", "Toggle bot quota")]
-  [CommandHelper(minArgs: 0, usage: "", whoCanExecute: CommandUsage.CLIENT_ONLY)]
-    public void OnBotCommand(CCSPlayerController? player, CommandInfo commandInfo)
-    {
-        if (player == null || !player.IsValid) return;
-
-        try
-       {
-       HandleBotToggle(player);
-        }
-        catch (Exception ex)
-        {
-      Console.WriteLine($"[Bot Waves] Error in bot command: {ex.Message}");
- }
-    }
-
-    private void HandleBotToggle(CCSPlayerController player)
-    {
-        try
-        {
-            // Check if feature is enabled in config
-            if (!Config.EnableBotQuotaToggle)
+            // Delay slightly to ensure weapons have been given
+            AddTimer(0.1f, () =>
             {
-   return; // Silently ignore if disabled
+                if (player.IsValid)
+                {
+                    StripBotWeapons(player);
+                }
+            });
+        }
+        
+        return HookResult.Continue;
     }
 
-            // Check if wave mode is active
-            if (g_Main.isWaveModeActive)
-         {
-         player.PrintToChat(Localizer["Bot.CannotUseDuringWave"]);
-      return;
-       }
-
-            // Check if exactly 1 active player (non-spectator)
-int activePlayers = GetActivePlayerCount();
-     if (activePlayers != 1)
-         {
-  // Silently ignore if not exactly 1 active player
-                return;
-    }
-
-            // Toggle bot state
-    g_Main.isBotsDisabledByCommand = !g_Main.isBotsDisabledByCommand;
-
-        if (g_Main.isBotsDisabledByCommand)
-   {
-             // Disable bots
-          Server.ExecuteCommand("bot_kick");
-         Server.ExecuteCommand($"bot_quota {Config.BotQuotaDisabled}");
-         Server.PrintToChatAll(Localizer["Bot.Removed"]);
-       }
-       else
+    // ============================================================
+    // ROUND LOGIC
+    // ============================================================
+    
+    /// <summary>
+    /// Sets up a new round with bots.
+    /// </summary>
+    private void SetupRound()
+    {
+        Debug("ROUND", "=== SETUP ROUND ===");
+        Debug("ROUND", $"BotCount={_state.BotCount}, IsEasyMode={_state.IsEasyMode}");
+        
+        // Keep win conditions disabled during spawn
+        Server.ExecuteCommand("mp_ignore_round_win_conditions 1");
+        
+        // Ensure bot settings are correct
+        Server.ExecuteCommand("bot_join_team ct");
+        Server.ExecuteCommand("bot_quota_mode fill");
+        
+        // Apply difficulty
+        ApplyDifficulty(_state.IsEasyMode);
+        
+        // Set round time
+        SetRoundTime(_state.BotCount);
+        
+        // Store player count for wave increment
+        _state.PlayersAtRoundStart = GetHumanPlayerCount();
+        Debug("ROUND", $"PlayersAtRoundStart={_state.PlayersAtRoundStart}");
+        
+        // Spawn bots
+        SpawnBots(_state.BotCount);
+        
+        // Show message
+        if (Config.ShowWaveStartMessages)
+        {
+            var diff = _state.IsEasyMode ? "Easy" : "Hard";
+            Server.PrintToChatAll(Localizer["Wave.RoundStart", _state.BotCount, diff]);
+        }
+        
+        // Schedule spawn check to re-enable win conditions and handle limited spawn points
+        Debug("ROUND", $"Scheduling spawn check in {Config.SpawnCheckDelay}s");
+        _state.SpawnCheckTimer = AddTimer(Config.SpawnCheckDelay, () =>
+        {
+            if (!_state.IsActive) return;
+            
+            Debug("SPAWN", "=== SPAWN CHECK ===");
+            DebugBotStatus("SPAWN CHECK");
+            
+            // Log all bots currently on server
+            var allBots = Utilities.GetPlayers().Where(p => p is { IsValid: true, IsBot: true }).ToList();
+            Debug("SPAWN", $"Total bots on server: {allBots.Count}");
+            foreach (var bot in allBots)
             {
-    // Enable bots
-       Server.ExecuteCommand($"bot_quota {Config.BotQuotaNormal}");
-      Server.PrintToChatAll(Localizer["Bot.Added"]);
+                Debug("SPAWN", $"  Bot: {bot.PlayerName}, Team={bot.Team}, IsValid={bot.IsValid}, PawnIsAlive={bot.PawnIsAlive}");
+            }
+            
+            var actualBots = CountBots();
+            var aliveBots = CountAliveBots();
+            var expectedBots = _state.BotCount;
+            Debug("SPAWN", $"CT bots: {actualBots}, Alive CT bots: {aliveBots}, Expected: {expectedBots}");
+            
+            // If no bots spawned at all, try again
+            if (actualBots == 0)
+            {
+                Debug("SPAWN", "No bots found! Forcing bot spawn...");
+                Server.ExecuteCommand("bot_join_team ct");
+                Server.ExecuteCommand($"bot_quota {expectedBots}");
+                // Re-check after another delay
+                AddTimer(Config.SpawnCheckDelay, () =>
+                {
+                    DebugBotStatus("SPAWN RE-CHECK");
+                    CheckAndEnableRespawns();
+                });
+            }
+            else
+            {
+                // Check if we need respawns due to limited spawn points
+                CheckAndEnableRespawns();
+            }
+            
+            Debug("SPAWN", "Enabling win conditions");
+            Server.ExecuteCommand("mp_ignore_round_win_conditions 0");
+            _state.JustActivated = false;
+            Debug("SPAWN", "=== SPAWN CHECK COMPLETE ===");
+        });
+        
+        Debug("ROUND", "=== SETUP COMPLETE ===");
+    }
+    
+    /// <summary>
+    /// Checks if the map has limited spawn points and enables respawn system if needed.
+    /// </summary>
+    private void CheckAndEnableRespawns()
+    {
+        var actualBots = CountBots();
+        var aliveBots = CountAliveBots();
+        var expectedBots = _state.BotCount;
+        
+        Debug("RESPAWN", $"Checking spawn points: actual={actualBots}, alive={aliveBots}, expected={expectedBots}");
+        DebugBotStatus("CHECK RESPAWNS");
+        
+        // CRITICAL: Check if bots exist but are DEAD (joined too late to spawn)
+        if (actualBots > 0 && aliveBots == 0)
+        {
+            Debug("RESPAWN", $"*** PROBLEM DETECTED: {actualBots} bots exist but ALL ARE DEAD! Bots joined too late to spawn. ***");
+        }
+        else if (aliveBots < actualBots)
+        {
+            Debug("RESPAWN", $"*** WARNING: {actualBots - aliveBots} bots are dead out of {actualBots} total ***");
+        }
+        
+        // If fewer bots spawned than expected, enable respawn system
+        if (actualBots < expectedBots)
+        {
+            // Total kills needed = expected bot count
+            // Respawns needed = expected - actual (how many extra kills beyond initial bots)
+            _state.TotalKillsNeeded = expectedBots;
+            _state.RespawnsRemaining = expectedBots - actualBots;
+            _state.CurrentKills = 0;
+            _state.RespawnEnabled = true;
+            
+            Debug("RESPAWN", $"Limited spawn points detected! TotalKillsNeeded={_state.TotalKillsNeeded}, RespawnsRemaining={_state.RespawnsRemaining}");
+            Server.ExecuteCommand("mp_respawn_on_death_ct 1");
+            
+            if (Config.ShowWaveStartMessages)
+            {
+                Server.PrintToChatAll(Localizer["Wave.LimitedSpawns", actualBots, expectedBots, _state.TotalKillsNeeded]);
             }
         }
-        catch (Exception ex)
+        else
         {
-      Console.WriteLine($"[Bot Waves] Error in HandleBotToggle: {ex.Message}");
+            // All bots spawned, no respawns needed
+            _state.TotalKillsNeeded = expectedBots;
+            _state.RespawnsRemaining = 0;
+            _state.CurrentKills = 0;
+            _state.RespawnEnabled = false;
+            Debug("RESPAWN", "All bots spawned, respawn system not needed");
+        }
+    }
+    
+    /// <summary>
+    /// Spawns the specified number of bots.
+    /// Uses bot_quota with fill mode - quota is total players (humans + bots).
+    /// </summary>
+    private void SpawnBots(int count)
+    {
+        Debug("SPAWN", $"=== SPAWNING {count} BOTS ===");
+        DebugBotStatus("BEFORE SPAWN BOTS");
+        
+        // Calculate max bots based on server slots
+        var humanCount = GetHumanPlayerCount();
+        var maxBots = Math.Max(1, Server.MaxPlayers - humanCount - 1);
+        var actualBotCount = Math.Min(count, maxBots);
+        
+        Debug("SPAWN", $"Humans={humanCount}, MaxSlots={Server.MaxPlayers}, MaxBots={maxBots}, RequestedBots={actualBotCount}");
+        
+        if (actualBotCount < count)
+        {
+            Server.PrintToChatAll(Localizer["Wave.BotsCapped", actualBotCount, count]);
+        }
+        
+        // Check existing bots first
+        var existingBots = CountBots();
+        Debug("SPAWN", $"Existing CT bots: {existingBots}");
+        
+        // With fill mode, bot_quota is TOTAL players (humans + bots)
+        // So we need: quota = humans + desired_bots
+        var totalQuota = humanCount + actualBotCount;
+        Debug("SPAWN", $"Setting bot_quota to {totalQuota} (humans={humanCount} + bots={actualBotCount})");
+        
+        // If we have too many bots, kick them first
+        if (existingBots > actualBotCount)
+        {
+            var toKick = existingBots - actualBotCount;
+            Debug("SPAWN", $"Kicking {toKick} extra bots");
+            for (int i = 0; i < toKick; i++)
+            {
+                Server.ExecuteCommand("bot_kick ct");
+            }
+        }
+        
+        // Set bot quota - fill mode will add bots to reach total
+        Server.ExecuteCommand("bot_join_team ct");
+        Server.ExecuteCommand($"bot_quota {totalQuota}");
+        
+        Debug("SPAWN", "=== SPAWN COMPLETE ===");
+        
+        // Add a delayed check to see bot status after spawn commands execute
+        AddTimer(0.5f, () =>
+        {
+            DebugBotStatus("AFTER SPAWN BOTS (0.5s delay)");
+        });
+    }
+    
+    /// <summary>
+    /// Sets round time based on bot count.
+    /// </summary>
+    private void SetRoundTime(int botCount)
+    {
+        if (!Config.EnableDynamicRoundTime) return;
+        
+        var seconds = Config.BaseRoundTimeSeconds;
+        if (botCount > Config.BotThresholdForExtraTime)
+        {
+            seconds += (botCount - Config.BotThresholdForExtraTime) * Config.ExtraSecondsPerBot;
+        }
+        
+        var minutes = seconds / 60.0f;
+        Debug("ROUND", $"RoundTime={seconds}s ({minutes:F2}min) for {botCount} bots");
+        Server.ExecuteCommand($"mp_roundtime {minutes:F2}");
+    }
+    
+    /// <summary>
+    /// Handles wave victory (humans win).
+    /// </summary>
+    private void HandleVictory()
+    {
+        Debug("WAVE", "=== VICTORY ===");
+        
+        _state.ConsecutiveFailures = 0;
+        
+        // Increment bot count
+        var increment = Math.Max(Config.MinimumWaveIncrement, _state.PlayersAtRoundStart);
+        var oldCount = _state.BotCount;
+        _state.BotCount += increment;
+        
+        Debug("WAVE", $"BotCount: {oldCount} + {increment} = {_state.BotCount}");
+        
+        if (Config.ShowWaveEndMessages)
+        {
+            Server.PrintToChatAll(Localizer["Wave.Victory", increment]);
+        }
+        
+        // PRE-SPAWN BOTS: Prepare bots for next round so they spawn with it
+        // Need to kick existing bots and set quota to new count
+        Debug("WAVE", $"Pre-spawning {_state.BotCount} bots for next round...");
+        Server.ExecuteCommand("bot_kick");
+        var humanCount = GetHumanPlayerCount();
+        var totalQuota = humanCount + _state.BotCount;
+        Server.ExecuteCommand("bot_join_team ct");
+        Server.ExecuteCommand($"bot_quota {totalQuota}");
+        DebugBotStatus("AFTER VICTORY PRE-SPAWN");
+    }
+    
+    /// <summary>
+    /// Handles wave defeat (bots win).
+    /// </summary>
+    private void HandleDefeat()
+    {
+        Debug("WAVE", "=== DEFEAT ===");
+        
+        _state.ConsecutiveFailures++;
+        Debug("WAVE", $"ConsecutiveFailures={_state.ConsecutiveFailures}/{Config.MaxFailuresBeforeReduction}");
+        
+        Server.PrintToChatAll(Localizer["Wave.Defeat", _state.ConsecutiveFailures, Config.MaxFailuresBeforeReduction]);
+        
+        // Reduce difficulty if too many failures
+        if (_state.ConsecutiveFailures >= Config.MaxFailuresBeforeReduction)
+        {
+            var oldCount = _state.BotCount;
+            var reduction = Math.Max(1, (int)(oldCount * Config.WaveReductionPercentage / 100.0));
+            _state.BotCount = Math.Max(Config.MinimumBotsPerWave, oldCount - reduction);
+            _state.ConsecutiveFailures = 0;
+            
+            Debug("WAVE", $"Reducing: {oldCount} - {reduction} = {_state.BotCount}");
+            Server.PrintToChatAll(Localizer["Wave.Reduced", oldCount, _state.BotCount]);
+        }
+        
+        // PRE-SPAWN BOTS: Prepare bots for next round so they spawn with it
+        Debug("WAVE", $"Pre-spawning {_state.BotCount} bots for next round...");
+        Server.ExecuteCommand("bot_kick");
+        var humanCount = GetHumanPlayerCount();
+        var totalQuota = humanCount + _state.BotCount;
+        Server.ExecuteCommand("bot_join_team ct");
+        Server.ExecuteCommand($"bot_quota {totalQuota}");
+        DebugBotStatus("AFTER DEFEAT PRE-SPAWN");
+    }
+
+    // ============================================================
+    // HELP TIMER
+    // ============================================================
+    
+    /// <summary>
+    /// Starts the periodic help message timer.
+    /// </summary>
+    private void StartHelpTimer()
+    {
+        if (!Config.ShowHelpMessages) return;
+        
+        _state.HelpTimer?.Kill();
+        _state.HelpTimer = AddTimer(Config.HelpMessageIntervalSeconds, () =>
+        {
+            if (_state.IsActive) return;
+            
+            var count = GetHumanPlayerCount();
+            if (count >= 1 && count <= Config.MaxPlayersAllowed)
+            {
+                Server.PrintToChatAll(Localizer["Wave.Help"]);
+            }
+        }, TimerFlags.REPEAT);
+    }
+
+    // ============================================================
+    // UTILITY METHODS
+    // ============================================================
+    
+    /// <summary>
+    /// Checks if player is a valid human (not bot, not HLTV).
+    /// </summary>
+    private static bool IsValidHuman(CCSPlayerController? player)
+    {
+        return player is { IsValid: true, IsBot: false, IsHLTV: false };
+    }
+    
+    /// <summary>
+    /// Gets count of connected human players.
+    /// </summary>
+    private static int GetHumanPlayerCount()
+    {
+        return Utilities.GetPlayers()
+            .Count(p => p is { IsValid: true, IsBot: false, IsHLTV: false } &&
+                        p.Connected == PlayerConnectedState.PlayerConnected);
+    }
+    
+    /// <summary>
+    /// Counts bots on the bot team.
+    /// </summary>
+    private int CountBots()
+    {
+        return Utilities.GetPlayers()
+            .Count(p => p is { IsValid: true, IsBot: true } && p.Team == _state.BotTeam);
+    }
+    
+    /// <summary>
+    /// Counts alive bots on the bot team.
+    /// </summary>
+    private int CountAliveBots()
+    {
+        return Utilities.GetPlayers()
+            .Count(p => p is { IsValid: true, IsBot: true, PawnIsAlive: true } && p.Team == _state.BotTeam);
+    }
+    
+    /// <summary>
+    /// Logs detailed status of all bots including alive/dead state.
+    /// </summary>
+    private void DebugBotStatus(string context)
+    {
+        if (!Config.DebugMode) return;
+        
+        var allBots = Utilities.GetPlayers().Where(p => p is { IsValid: true, IsBot: true }).ToList();
+        var ctBots = allBots.Where(p => p.Team == _state.BotTeam).ToList();
+        var aliveCt = ctBots.Count(p => p.PawnIsAlive);
+        var deadCt = ctBots.Count(p => !p.PawnIsAlive);
+        
+        Debug("BOTSTATUS", $"=== {context} ===");
+        Debug("BOTSTATUS", $"Total bots: {allBots.Count}, CT bots: {ctBots.Count}, Alive: {aliveCt}, Dead: {deadCt}");
+        
+        foreach (var bot in ctBots)
+        {
+            var pawn = bot.PlayerPawn?.Value;
+            var health = pawn?.Health ?? 0;
+            var lifeState = pawn?.LifeState ?? 0;
+            Debug("BOTSTATUS", $"  [{(bot.PawnIsAlive ? "ALIVE" : "DEAD ")}] {bot.PlayerName} - Team={bot.Team}, Health={health}, LifeState={lifeState}");
+        }
+        
+        Debug("BOTSTATUS", $"=== END {context} ===");
+    }
+    
+    /// <summary>
+    /// Strips all weapons from a bot except their knife.
+    /// Used in Easy mode to make bots knife-only.
+    /// </summary>
+    private void StripBotWeapons(CCSPlayerController player)
+    {
+        var pawn = player.PlayerPawn?.Value;
+        if (pawn?.WeaponServices?.MyWeapons is null) return;
+        
+        Debug("WEAPON", $"Stripping weapons from {player.PlayerName}");
+        
+        foreach (var weaponHandle in pawn.WeaponServices.MyWeapons)
+        {
+            var weapon = weaponHandle.Value;
+            if (weapon is null || !weapon.IsValid) continue;
+            
+            // Keep knives
+            if (weapon.DesignerName.Contains("knife"))
+            {
+                continue;
+            }
+            
+            // Remove everything else
+            Debug("WEAPON", $"  Removing: {weapon.DesignerName}");
+            weapon.Remove();
         }
     }
 }
