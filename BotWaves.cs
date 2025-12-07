@@ -114,6 +114,8 @@ public sealed class BotWaves : BasePlugin, IPluginConfig<ConfigGen>
         Config.WaveReductionPercentage = Math.Clamp(Config.WaveReductionPercentage, 1, 100);
         Config.BaseRoundTimeSeconds = Math.Max(30, Config.BaseRoundTimeSeconds);
         Config.HelpMessageIntervalSeconds = Math.Max(10, Config.HelpMessageIntervalSeconds);
+        Config.WelcomeMessageDelaySeconds = Math.Max(1, Config.WelcomeMessageDelaySeconds);
+        Config.WelcomeMessageRepeatSeconds = Math.Max(10, Config.WelcomeMessageRepeatSeconds);
         
         if (Config.DebugMode)
         {
@@ -671,6 +673,9 @@ public sealed class BotWaves : BasePlugin, IPluginConfig<ConfigGen>
                 Server.PrintToChatAll(Localizer["Wave.PlayerLimitExceeded"]);
                 DisableWaveMode();
             }
+            
+            // Schedule welcome message for this player
+            ScheduleWelcomeMessage(player);
         });
         
         return HookResult.Continue;
@@ -762,6 +767,9 @@ public sealed class BotWaves : BasePlugin, IPluginConfig<ConfigGen>
         
         _state.IsRoundActive = false;
         
+        // Stop the respawn HUD
+        StopRespawnHud();
+        
         // Disable respawns at round end
         if (_state.RespawnEnabled)
         {
@@ -825,6 +833,10 @@ public sealed class BotWaves : BasePlugin, IPluginConfig<ConfigGen>
                 {
                     Debug("RESPAWN", "No respawns remaining, disabling mp_respawn_on_death_ct");
                     Server.ExecuteCommand("mp_respawn_on_death_ct 0");
+                    
+                    // Stop the countdown HUD and show the final "FINISH THEM!" message
+                    StopRespawnHud();
+                    ShowFinalRespawnMessage();
                 }
             }
         }
@@ -988,6 +1000,9 @@ public sealed class BotWaves : BasePlugin, IPluginConfig<ConfigGen>
             
             Debug("RESPAWN", $"Limited spawn points detected! TotalKillsNeeded={_state.TotalKillsNeeded}, RespawnsRemaining={_state.RespawnsRemaining}");
             Server.ExecuteCommand("mp_respawn_on_death_ct 1");
+            
+            // Start the persistent respawn HUD
+            StartRespawnHud();
             
             if (Config.ShowWaveStartMessages)
             {
@@ -1165,6 +1180,183 @@ public sealed class BotWaves : BasePlugin, IPluginConfig<ConfigGen>
                 Server.PrintToChatAll(Localizer["Wave.Help"]);
             }
         }, TimerFlags.REPEAT);
+    }
+
+    // ============================================================
+    // WELCOME MESSAGE SYSTEM
+    // ============================================================
+    
+    /// <summary>
+    /// Schedules a welcome message for a player who just joined.
+    /// Message is sent after a delay, then starts a repeating timer.
+    /// Only shows when 1-5 players and wave mode is inactive.
+    /// </summary>
+    private void ScheduleWelcomeMessage(CCSPlayerController player)
+    {
+        if (!Config.ShowWelcomeMessages) return;
+        
+        Debug("WELCOME", $"Scheduling welcome message for {player.PlayerName} in {Config.WelcomeMessageDelaySeconds}s");
+        
+        // Schedule first welcome message after delay
+        AddTimer(Config.WelcomeMessageDelaySeconds, () =>
+        {
+            if (!player.IsValid) return;
+            
+            // Show first welcome message
+            ShowWelcomeMessage();
+            
+            // Start the repeating welcome timer (if not already running)
+            StartWelcomeTimer();
+        });
+    }
+    
+    /// <summary>
+    /// Starts the periodic welcome message timer.
+    /// </summary>
+    private void StartWelcomeTimer()
+    {
+        if (!Config.ShowWelcomeMessages) return;
+        
+        // Don't start if already running
+        if (_state.WelcomeTimer != null) return;
+        
+        Debug("WELCOME", $"Starting welcome timer, interval={Config.WelcomeMessageRepeatSeconds}s");
+        
+        _state.WelcomeTimer = AddTimer(Config.WelcomeMessageRepeatSeconds, () =>
+        {
+            ShowWelcomeMessage();
+        }, TimerFlags.REPEAT);
+    }
+    
+    /// <summary>
+    /// Shows the welcome message if conditions are met.
+    /// Only shows when wave mode is inactive and 1-5 players are on server.
+    /// </summary>
+    private void ShowWelcomeMessage()
+    {
+        // Don't show if wave mode is active
+        if (_state.IsActive)
+        {
+            Debug("WELCOME", "Skipping welcome message - wave mode active");
+            return;
+        }
+        
+        var count = GetHumanPlayerCount();
+        
+        // Only show when 1-5 players (wave mode is available)
+        if (count < 1 || count > Config.MaxPlayersAllowed)
+        {
+            Debug("WELCOME", $"Skipping welcome message - player count {count} outside range 1-{Config.MaxPlayersAllowed}");
+            return;
+        }
+        
+        Debug("WELCOME", $"Showing welcome message to {count} players");
+        Server.PrintToChatAll(Localizer["Wave.Welcome"]);
+    }
+
+    // ============================================================
+    // RESPAWN HUD SYSTEM
+    // Displays persistent center HUD showing respawns remaining.
+    // Uses a repeating timer to keep the HUD visible without flickering.
+    // ============================================================
+    
+    /// <summary>
+    /// Starts the persistent respawn HUD display.
+    /// Timer refreshes every 0.1s to keep the HUD visible.
+    /// </summary>
+    private void StartRespawnHud()
+    {
+        // Kill any existing HUD timer
+        StopRespawnHud();
+        
+        Debug("HUD", $"Starting respawn HUD, RespawnsRemaining={_state.RespawnsRemaining}");
+        
+        // Refresh HUD every 0.1 seconds to keep it persistently visible
+        _state.RespawnHudTimer = AddTimer(0.1f, () =>
+        {
+            if (!_state.IsActive || !_state.IsRoundActive || !_state.RespawnEnabled)
+            {
+                StopRespawnHud();
+                return;
+            }
+            
+            UpdateRespawnHud();
+        }, TimerFlags.REPEAT);
+    }
+    
+    /// <summary>
+    /// Stops the respawn HUD timer.
+    /// </summary>
+    private void StopRespawnHud()
+    {
+        if (_state.RespawnHudTimer != null)
+        {
+            Debug("HUD", "Stopping respawn HUD timer");
+            _state.RespawnHudTimer.Kill();
+            _state.RespawnHudTimer = null;
+        }
+    }
+    
+    /// <summary>
+    /// Updates the center HUD with current respawn count.
+    /// Shows "X Respawns" during countdown, then "0 Respawns - FINISH THEM!" when done.
+    /// </summary>
+    private void UpdateRespawnHud()
+    {
+        string hudText;
+        
+        if (_state.RespawnsRemaining > 0)
+        {
+            hudText = Localizer["Wave.RespawnHud", _state.RespawnsRemaining];
+        }
+        else
+        {
+            hudText = Localizer["Wave.RespawnHudFinish"];
+        }
+        
+        // Show to all human players
+        foreach (var player in Utilities.GetPlayers())
+        {
+            if (IsValidHuman(player))
+            {
+                player.PrintToCenter(hudText);
+            }
+        }
+    }
+    
+    /// <summary>
+    /// Shows the final "FINISH THEM!" message for a few seconds after respawns end.
+    /// </summary>
+    private void ShowFinalRespawnMessage()
+    {
+        Debug("HUD", "Showing final FINISH THEM message");
+        
+        // Cache the localized string once
+        var finalMessage = Localizer["Wave.RespawnHudFinish"].ToString();
+        
+        // Show the final message for 3 seconds via a temporary timer
+        var displayCount = 0;
+        var finalTimer = AddTimer(0.1f, () =>
+        {
+            displayCount++;
+            
+            // Show for ~3 seconds (30 ticks at 0.1s)
+            if (displayCount > 30 || !_state.IsActive || !_state.IsRoundActive)
+            {
+                return;
+            }
+            
+            foreach (var player in Utilities.GetPlayers())
+            {
+                if (IsValidHuman(player))
+                {
+                    player.PrintToCenter(finalMessage);
+                }
+            }
+        }, TimerFlags.REPEAT);
+        
+        // Auto-kill after 3.5 seconds as safety
+        AddTimer(3.5f, () => finalTimer?.Kill());
     }
 
     // ============================================================

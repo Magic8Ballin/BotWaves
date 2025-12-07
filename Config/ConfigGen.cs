@@ -131,6 +131,25 @@ public sealed class ConfigGen : BasePluginConfig
     // ============================================================
     
     /// <summary>
+    /// Show welcome messages to new players about Bot Waves mode.
+    /// Only shown when 1-5 players are on the server and wave mode is inactive.
+    /// </summary>
+    [JsonPropertyName("ShowWelcomeMessages")]
+    public bool ShowWelcomeMessages { get; set; } = true;
+    
+    /// <summary>
+    /// Delay in seconds before showing the first welcome message after a player joins.
+    /// </summary>
+    [JsonPropertyName("WelcomeMessageDelaySeconds")]
+    public float WelcomeMessageDelaySeconds { get; set; } = 5.0f;
+    
+    /// <summary>
+    /// Interval in seconds between repeating welcome messages.
+    /// </summary>
+    [JsonPropertyName("WelcomeMessageRepeatSeconds")]
+    public float WelcomeMessageRepeatSeconds { get; set; } = 90.0f;
+    
+    /// <summary>
     /// Show wave start messages (bot count, difficulty).
     /// </summary>
     [JsonPropertyName("ShowWaveStartMessages")]
