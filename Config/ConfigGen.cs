@@ -183,6 +183,15 @@ public sealed class ConfigGen : BasePluginConfig
     /// </summary>
     [JsonPropertyName("DisableSkillAutoBalance")]
     public bool DisableSkillAutoBalance { get; set; } = true;
+    
+    /// <summary>
+    /// Enable the Infinite Spawns plugin integration.
+    /// When enabled, executes css_infinitespawns 1 when wave mode starts
+    /// and css_infinitespawns 0 when wave mode ends.
+    /// Requires the Infinite Spawns plugin to be installed.
+    /// </summary>
+    [JsonPropertyName("EnableInfiniteSpawns")]
+    public bool EnableInfiniteSpawns { get; set; } = false;
 
     // ============================================================
     // TIMING SETTINGS
