@@ -20,8 +20,8 @@ public sealed class BotWaves : BasePlugin, IPluginConfig<ConfigGen>
     // ============================================================
     
     public override string ModuleName => "Bot Waves";
-    public override string ModuleVersion => "4.0.0";
-    public override string ModuleAuthor => "Gold KingZ & Magic8Ball";
+    public override string ModuleVersion => "5.0.0";
+    public override string ModuleAuthor => "Magic8Ball";
     public override string ModuleDescription => "Cooperative survival mode - fight waves of bots!";
 
     // ============================================================
