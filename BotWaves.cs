@@ -25,16 +25,6 @@ public sealed class BotWaves : BasePlugin, IPluginConfig<ConfigGen>
     public override string ModuleDescription => "Cooperative survival mode - fight waves of bots!";
 
     // ============================================================
-    // CONSTANTS
-    // ============================================================
-    
-    private static class Difficulty
-    {
-        public const int Easy = 1;   // Bots don't shoot, knife-only
-        public const int Hard = 5;   // Expert bots with all weapons
-    }
-
-    // ============================================================
     // STATE
     // ============================================================
     
@@ -461,11 +451,11 @@ public sealed class BotWaves : BasePlugin, IPluginConfig<ConfigGen>
         Server.ExecuteCommand("bot_quota 0");
         Server.ExecuteCommand("bot_kick");
         
-        // Configure server cvars
-        ConfigureServerCvars();
+        // Execute wave enabled config
+        ExecuteConfig(Config.WaveEnabledConfig);
         
         // Set initial difficulty (Easy mode)
-        ApplyDifficulty(easy: true);
+        ExecuteConfig(Config.DifficultyEasyConfig);
         
         // Move all humans to T team
         Debug("WAVE", "Moving humans to T team...");
@@ -514,8 +504,8 @@ public sealed class BotWaves : BasePlugin, IPluginConfig<ConfigGen>
         Debug("WAVE", "Resetting bots for normal play...");
         Server.ExecuteCommand("bot_kick");
         
-        // Restore default cvars
-        RestoreServerCvars();
+        // Execute wave disabled config to restore server settings
+        ExecuteConfig(Config.WaveDisabledConfig);
         
         // Set bot quota to allow 1 bot for normal gameplay
         Server.ExecuteCommand("bot_quota 1");
@@ -540,7 +530,9 @@ public sealed class BotWaves : BasePlugin, IPluginConfig<ConfigGen>
         Server.ExecuteCommand("bot_quota 0");
         Server.ExecuteCommand("bot_kick");
         
-        ApplyDifficulty(_state.IsEasyMode);
+        // Execute the appropriate difficulty config
+        var difficultyConfig = _state.IsEasyMode ? Config.DifficultyEasyConfig : Config.DifficultyHardConfig;
+        ExecuteConfig(difficultyConfig);
         
         var msg = _state.IsEasyMode ? Localizer["Wave.DifficultyEasy"] : Localizer["Wave.DifficultyHard"];
         Server.PrintToChatAll(msg);
@@ -565,82 +557,18 @@ public sealed class BotWaves : BasePlugin, IPluginConfig<ConfigGen>
     }
     
     /// <summary>
-    /// Applies difficulty cvars for CS2.
-    /// Values 1-5: 1=bots don't shoot, 2=easy, 3=normal, 4=hard, 5=expert
+    /// Executes a config file from the cfg folder.
     /// </summary>
-    private void ApplyDifficulty(bool easy)
+    private void ExecuteConfig(string configPath)
     {
-        Debug("CVAR", $"Applying difficulty: {(easy ? "EASY" : "HARD")}");
-        
-        var difficulty = easy ? Difficulty.Easy : Difficulty.Hard;
-        Server.ExecuteCommand($"bot_difficulty {difficulty}");
-        Server.ExecuteCommand($"custom_bot_difficulty {difficulty}");
-    }
-    
-    /// <summary>
-    /// Configures server cvars for wave mode.
-    /// </summary>
-    private void ConfigureServerCvars()
-    {
-        Debug("CVAR", "=== CONFIGURING SERVER ===");
-        
-        // Disable auto-balance first
-        Server.ExecuteCommand("mp_autoteambalance 0");
-        Server.ExecuteCommand("mp_limitteams 0");
-        Server.ExecuteCommand("mp_force_pick_time 0");
-        
-        // Force bots to CT
-        Server.ExecuteCommand("bot_join_team ct");
-        Server.ExecuteCommand("bot_quota_mode fill");
-        
-        // Disable difficulty auto-adjust
-        Server.ExecuteCommand("sv_auto_adjust_bot_difficulty false");
-        
-        // Prevent round end during setup
-        Server.ExecuteCommand("mp_ignore_round_win_conditions 1");
-        
-        // Bots should NOT respawn - players must kill all bots to win the wave
-        Server.ExecuteCommand("mp_respawn_on_death_ct 0");
-        Server.ExecuteCommand("mp_respawn_on_death_t 0");
-        
-        // Additional respawn prevention for deathmatch/casual modes
-        Server.ExecuteCommand("mp_dm_bonus_length_max 0");
-        Server.ExecuteCommand("mp_dm_bonus_length_min 0");
-        Server.ExecuteCommand("mp_dm_time_between_bonus_max 9999");
-        Server.ExecuteCommand("mp_dm_time_between_bonus_min 9999");
-        
-        // Misc settings
-        Server.ExecuteCommand("mp_warmuptime 0");
-        Server.ExecuteCommand("mp_forcecamera 1");
-        
-        // Third-party plugin integration
-        if (Config.DisableSkillAutoBalance)
+        if (string.IsNullOrWhiteSpace(configPath))
         {
-            Server.ExecuteCommand("css_skill_autobalance_minplayers 30");
+            Debug("CONFIG", "Config path is empty, skipping");
+            return;
         }
         
-        Debug("CVAR", "=== SERVER CONFIGURED ===");
-    }
-    
-    /// <summary>
-    /// Restores default server cvars.
-    /// </summary>
-    private void RestoreServerCvars()
-    {
-        Debug("CVAR", "Restoring default cvars...");
-        
-        Server.ExecuteCommand("mp_autoteambalance 1");
-        Server.ExecuteCommand("mp_limitteams 2");
-        Server.ExecuteCommand("mp_ignore_round_win_conditions 0");
-        Server.ExecuteCommand("mp_respawn_on_death_ct 0");
-        Server.ExecuteCommand("bot_join_team any");
-        Server.ExecuteCommand("bot_quota_mode fill");
-        Server.ExecuteCommand("sv_auto_adjust_bot_difficulty true");
-        
-        if (Config.DisableSkillAutoBalance)
-        {
-            Server.ExecuteCommand("css_skill_autobalance_minplayers 5");
-        }
+        Debug("CONFIG", $"Executing config: {configPath}");
+        Server.ExecuteCommand($"exec {configPath}");
     }
 
     // ============================================================
@@ -849,8 +777,8 @@ public sealed class BotWaves : BasePlugin, IPluginConfig<ConfigGen>
         // Only process bots on the bot team
         if (player.Team != _state.BotTeam) return HookResult.Continue;
         
-        // In Easy mode, strip weapons so bots only have knives
-        if (_state.IsEasyMode)
+        // In Easy mode, strip weapons so bots only have knives (if enabled in config)
+        if (_state.IsEasyMode && Config.StripWeaponsOnEasyMode)
         {
             // Delay slightly to ensure weapons have been given
             AddTimer(0.1f, () =>
@@ -884,8 +812,9 @@ public sealed class BotWaves : BasePlugin, IPluginConfig<ConfigGen>
         Server.ExecuteCommand("bot_join_team ct");
         Server.ExecuteCommand("bot_quota_mode fill");
         
-        // Apply difficulty
-        ApplyDifficulty(_state.IsEasyMode);
+        // Execute the appropriate difficulty config
+        var difficultyConfig = _state.IsEasyMode ? Config.DifficultyEasyConfig : Config.DifficultyHardConfig;
+        ExecuteConfig(difficultyConfig);
         
         // Set round time
         SetRoundTime(_state.BotCount);

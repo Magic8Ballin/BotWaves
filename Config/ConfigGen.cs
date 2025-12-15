@@ -46,6 +46,38 @@ public sealed class ConfigGen : BasePluginConfig
     public bool DisableOnPlayerLimitExceeded { get; set; } = true;
 
     // ============================================================
+    // CONFIG FILE PATHS
+    // ============================================================
+    
+    /// <summary>
+    /// Config file executed when wave mode is enabled.
+    /// Path is relative to csgo/cfg/ folder.
+    /// </summary>
+    [JsonPropertyName("WaveEnabledConfig")]
+    public string WaveEnabledConfig { get; set; } = "botwaves/wave_enabled.cfg";
+    
+    /// <summary>
+    /// Config file executed when wave mode is disabled.
+    /// Path is relative to csgo/cfg/ folder.
+    /// </summary>
+    [JsonPropertyName("WaveDisabledConfig")]
+    public string WaveDisabledConfig { get; set; } = "botwaves/wave_disabled.cfg";
+    
+    /// <summary>
+    /// Config file executed when switching to Easy difficulty.
+    /// Path is relative to csgo/cfg/ folder.
+    /// </summary>
+    [JsonPropertyName("DifficultyEasyConfig")]
+    public string DifficultyEasyConfig { get; set; } = "botwaves/difficulty_easy.cfg";
+    
+    /// <summary>
+    /// Config file executed when switching to Hard difficulty.
+    /// Path is relative to csgo/cfg/ folder.
+    /// </summary>
+    [JsonPropertyName("DifficultyHardConfig")]
+    public string DifficultyHardConfig { get; set; } = "botwaves/difficulty_hard.cfg";
+
+    // ============================================================
     // VOTING SETTINGS
     // ============================================================
     
@@ -127,6 +159,17 @@ public sealed class ConfigGen : BasePluginConfig
     public float SpawnCheckDelay { get; set; } = 1.0f;
 
     // ============================================================
+    // DIFFICULTY SETTINGS
+    // ============================================================
+    
+    /// <summary>
+    /// Strip weapons from bots in Easy mode, leaving them with only a knife.
+    /// If false, bots keep their weapons but still won't shoot (bot_difficulty 1).
+    /// </summary>
+    [JsonPropertyName("StripWeaponsOnEasyMode")]
+    public bool StripWeaponsOnEasyMode { get; set; } = true;
+
+    // ============================================================
     // CHAT MESSAGE SETTINGS
     // ============================================================
     
@@ -153,17 +196,6 @@ public sealed class ConfigGen : BasePluginConfig
     /// </summary>
     [JsonPropertyName("HelpMessageIntervalSeconds")]
     public int HelpMessageIntervalSeconds { get; set; } = 60;
-
-    // ============================================================
-    // THIRD-PARTY PLUGIN SETTINGS
-    // ============================================================
-    
-    /// <summary>
-    /// Disable the Skill Auto Balance plugin during wave mode.
-    /// Sets css_skill_autobalance_minplayers to 30.
-    /// </summary>
-    [JsonPropertyName("DisableSkillAutoBalance")]
-    public bool DisableSkillAutoBalance { get; set; } = true;
 
     // ============================================================
     // TIMING SETTINGS
