@@ -1,6 +1,5 @@
 {
   "Wave.Help": " {gold}Bot Waves{default} - Type {lime}!wave{default} to start, {lime}!dif{default} to change difficulty",
-  "Wave.Welcome": " {lightblue}Want to fight bots?{default} Type {lime}wave{default} to start {gold}Bot Waves{default} mode!",
   
   "Wave.InvalidNumber": " {red}Invalid number.{default} Usage: !wave [number]",
   "Wave.NeedWaveActive": " {red}Wave mode must be active first!{default} Type {lime}!wave{default} to start.",
@@ -27,8 +26,5 @@
   
   "Wave.Victory": " {green}VICTORY!{default} Adding {lime}+{0}{default} bots next wave!",
   "Wave.Defeat": " {red}DEFEAT!{default} Failures: {yellow}{0}/{1}{default}",
-  "Wave.Reduced": " {yellow}Difficulty reduced:{default} {0} ? {lime}{1}{default} bots",
-  
-  "Wave.RespawnHud": "{0} Respawns",
-  "Wave.RespawnHudFinish": "0 Respawns - FINISH THEM!"
+  "Wave.Reduced": " {yellow}Difficulty reduced:{default} {0} ? {lime}{1}{default} bots"
 }

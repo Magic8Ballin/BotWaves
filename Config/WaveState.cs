@@ -87,12 +87,6 @@ public sealed class WaveState
     /// <summary>Timer for spawn check after round starts.</summary>
     public CssTimer? SpawnCheckTimer { get; set; }
     
-    /// <summary>Timer for periodic welcome messages when wave mode is inactive.</summary>
-    public CssTimer? WelcomeTimer { get; set; }
-    
-    /// <summary>Timer for persistent respawn countdown HUD display.</summary>
-    public CssTimer? RespawnHudTimer { get; set; }
-    
     // ============================================================
     // METHODS
     // ============================================================
@@ -156,12 +150,6 @@ public sealed class WaveState
         
         SpawnCheckTimer?.Kill();
         SpawnCheckTimer = null;
-        
-        WelcomeTimer?.Kill();
-        WelcomeTimer = null;
-        
-        RespawnHudTimer?.Kill();
-        RespawnHudTimer = null;
     }
     
     /// <summary>
