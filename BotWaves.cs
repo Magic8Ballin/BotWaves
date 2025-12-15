@@ -34,12 +34,6 @@ public sealed class BotWaves : BasePlugin, IPluginConfig<ConfigGen>
         public const int Hard = 5;   // Expert bots with all weapons
     }
 
-    /// <summary>
-    /// Maximum bot_quota value. With bot_quota_mode fill, this is total players (humans + bots).
-    /// Server.MaxPlayers determines the actual limit, but we cap at 64 for safety.
-    /// </summary>
-    private const int MaxBotQuota = 64;
-
     // ============================================================
     // STATE
     // ============================================================
@@ -270,7 +264,7 @@ public sealed class BotWaves : BasePlugin, IPluginConfig<ConfigGen>
             var humanCount = GetHumanPlayerCount();
             var totalQuota = humanCount + botCount;
             Server.ExecuteCommand("bot_join_team ct");
-            SetBotQuota(totalQuota);
+            Server.ExecuteCommand($"bot_quota {totalQuota}");
             
             // Small delay to let bots join before restart
             AddTimer(0.3f, () =>
@@ -472,12 +466,6 @@ public sealed class BotWaves : BasePlugin, IPluginConfig<ConfigGen>
         // Configure server cvars
         ConfigureServerCvars();
         
-        // Enable infinite spawns plugin if configured
-        if (Config.EnableInfiniteSpawns)
-        {
-            Server.ExecuteCommand("css_infinitespawns 1");
-        }
-        
         // Set initial difficulty (Easy mode)
         ApplyDifficulty(easy: true);
         
@@ -497,7 +485,7 @@ public sealed class BotWaves : BasePlugin, IPluginConfig<ConfigGen>
         var humanCount = GetHumanPlayerCount();
         var totalQuota = humanCount + startBots;
         Server.ExecuteCommand("bot_join_team ct");
-        SetBotQuota(totalQuota);
+        Server.ExecuteCommand($"bot_quota {totalQuota}");
         
         // Schedule round restart - bots are already on server, will spawn with the round
         Debug("WAVE", "Scheduling round restart...");
@@ -530,12 +518,6 @@ public sealed class BotWaves : BasePlugin, IPluginConfig<ConfigGen>
         
         // Restore default cvars
         RestoreServerCvars();
-        
-        // Disable infinite spawns plugin if configured
-        if (Config.EnableInfiniteSpawns)
-        {
-            Server.ExecuteCommand("css_infinitespawns 0");
-        }
         
         // Set bot quota to allow 1 bot for normal gameplay
         Server.ExecuteCommand("bot_quota 1");
@@ -570,7 +552,7 @@ public sealed class BotWaves : BasePlugin, IPluginConfig<ConfigGen>
         var humanCount = GetHumanPlayerCount();
         var totalQuota = humanCount + _state.BotCount;
         Server.ExecuteCommand("bot_join_team ct");
-        SetBotQuota(totalQuota);
+        Server.ExecuteCommand($"bot_quota {totalQuota}");
         
         // Small delay to let bots join before restart
         AddTimer(0.3f, () =>
@@ -961,7 +943,7 @@ public sealed class BotWaves : BasePlugin, IPluginConfig<ConfigGen>
             {
                 Debug("SPAWN", "No bots found! Forcing bot spawn...");
                 Server.ExecuteCommand("bot_join_team ct");
-                SetBotQuota(expectedBots);
+                Server.ExecuteCommand($"bot_quota {expectedBots}");
                 // Re-check after another delay
                 AddTimer(Config.SpawnCheckDelay, () =>
                 {
@@ -1081,8 +1063,8 @@ public sealed class BotWaves : BasePlugin, IPluginConfig<ConfigGen>
         
         // Set bot quota - fill mode will add bots to reach total
         Server.ExecuteCommand("bot_join_team ct");
-        SetBotQuota(totalQuota);
-
+        Server.ExecuteCommand($"bot_quota {totalQuota}");
+        
         Debug("SPAWN", "=== SPAWN COMPLETE ===");
         
         // Add a delayed check to see bot status after spawn commands execute
@@ -1138,7 +1120,7 @@ public sealed class BotWaves : BasePlugin, IPluginConfig<ConfigGen>
         var humanCount = GetHumanPlayerCount();
         var totalQuota = humanCount + _state.BotCount;
         Server.ExecuteCommand("bot_join_team ct");
-        SetBotQuota(totalQuota);
+        Server.ExecuteCommand($"bot_quota {totalQuota}");
         DebugBotStatus("AFTER VICTORY PRE-SPAWN");
     }
     
@@ -1172,7 +1154,7 @@ public sealed class BotWaves : BasePlugin, IPluginConfig<ConfigGen>
         var humanCount = GetHumanPlayerCount();
         var totalQuota = humanCount + _state.BotCount;
         Server.ExecuteCommand("bot_join_team ct");
-        SetBotQuota(totalQuota);
+        Server.ExecuteCommand($"bot_quota {totalQuota}");
         DebugBotStatus("AFTER DEFEAT PRE-SPAWN");
     }
 
@@ -1469,14 +1451,5 @@ public sealed class BotWaves : BasePlugin, IPluginConfig<ConfigGen>
             Debug("WEAPON", $"  Removing: {weapon.DesignerName}");
             weapon.Remove();
         }
-    }
-    
-    /// <summary>
-    /// Sets bot_quota while respecting the CS2 engine limit of 20 bots.
-    /// </summary>
-    private void SetBotQuota(int quota)
-    {
-        var clampedQuota = Math.Min(quota, MaxBotQuota);
-        Server.ExecuteCommand($"bot_quota {clampedQuota}");
     }
 }
